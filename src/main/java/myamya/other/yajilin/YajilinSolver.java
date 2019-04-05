@@ -13,15 +13,21 @@ import java.util.Set;
 
 public class YajilinSolver {
 
+	static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+
 	/**
 	 * 方向を示す列挙型
 	 */
 	enum Direction {
-	UP("u"), RIGHT("r"), DOWN("d"), LEFT("l");
+		UP("u", 1, "↑"), RIGHT("r", 4, "→"), DOWN("d", 2, "↓"), LEFT("l", 3, "←");
 		private final String str;
+		private final int num;
+		private final String directString;
 
-		Direction(String str) {
+		Direction(String str, int num, String directString) {
 			this.str = str;
+			this.num = num;
+			this.directString = directString;
 		}
 
 		@Override
@@ -51,38 +57,53 @@ public class YajilinSolver {
 			}
 			return null;
 		}
+
+		public static Direction getByNum(int num) {
+			for (Direction one : Direction.values()) {
+				if (one.num == num) {
+					return one;
+				}
+			}
+			return null;
+		}
+
+		public String getDirectString() {
+			return directString;
+		}
 	}
 
 	enum MasuImpl implements Masu {
 		/** 白マス */
-		SPACE("　", new ArrayList<>(), false),
+		SPACE("　", new ArrayList<>(), false, true),
 		/** 黒マス */
-		BLACK("■", new ArrayList<>(), false),
+		BLACK("■", new ArrayList<>(), false, false),
 		/** 黒にならないことが確定したマス */
-		NOT_BLACK("・", new ArrayList<>(), false),
+		NOT_BLACK("・", new ArrayList<>(), false, true),
 		/** */
-		UP_RIGHT("└", Arrays.asList(new Direction[] { Direction.UP, Direction.RIGHT }), true),
+		UP_RIGHT("└", Arrays.asList(new Direction[] { Direction.UP, Direction.RIGHT }), true, false),
 		/** */
-		UP_DOWN("│", Arrays.asList(new Direction[] { Direction.UP, Direction.DOWN }), true),
+		UP_DOWN("│", Arrays.asList(new Direction[] { Direction.UP, Direction.DOWN }), true, false),
 		/** */
-		UP_LEFT("┘", Arrays.asList(new Direction[] { Direction.UP, Direction.LEFT }), true),
+		UP_LEFT("┘", Arrays.asList(new Direction[] { Direction.UP, Direction.LEFT }), true, false),
 		/** */
-		RIGHT_DOWN("┌", Arrays.asList(new Direction[] { Direction.RIGHT, Direction.DOWN }), true),
+		RIGHT_DOWN("┌", Arrays.asList(new Direction[] { Direction.RIGHT, Direction.DOWN }), true, false),
 		/** */
-		RIGHT_LEFT("─", Arrays.asList(new Direction[] { Direction.RIGHT, Direction.LEFT }), true),
+		RIGHT_LEFT("─", Arrays.asList(new Direction[] { Direction.RIGHT, Direction.LEFT }), true, false),
 		/** */
-		DOWN_LEFT("┐", Arrays.asList(new Direction[] { Direction.DOWN, Direction.LEFT }), true),
+		DOWN_LEFT("┐", Arrays.asList(new Direction[] { Direction.DOWN, Direction.LEFT }), true, false),
 		/** 外壁。 */
-		WALL("＊", new ArrayList<>(), false);
+		WALL("＊", new ArrayList<>(), false, false);
 
 		private final String str;
 		private final List<Direction> targetDirection;
 		private final boolean isPath;
+		private final boolean isNotFixed;
 
-		MasuImpl(String str, List<Direction> targetDirection, boolean isPath) {
+		MasuImpl(String str, List<Direction> targetDirection, boolean isPath, boolean isNotFixed) {
 			this.str = str;
 			this.targetDirection = targetDirection;
 			this.isPath = isPath;
+			this.isNotFixed = isNotFixed;
 		}
 
 		@Override
@@ -100,6 +121,16 @@ public class YajilinSolver {
 			return isPath;
 		}
 
+		@Override
+		public String toStringForweb() {
+			return toString();
+		}
+
+		@Override
+		public boolean isNotFixed() {
+			return isNotFixed;
+		}
+
 	}
 
 	/**
@@ -112,6 +143,10 @@ public class YajilinSolver {
 		List<Direction> getTargetDirection();
 
 		boolean isPath();
+
+		boolean isNotFixed();
+
+		Object toStringForweb();
 	}
 
 	static class Position {
@@ -166,9 +201,9 @@ public class YajilinSolver {
 		private final Direction direction;
 		private final int count;
 
-		public Arrow(Direction direction, int count) {
+		public Arrow(Direction direction, char ch) {
 			this.direction = direction;
-			this.count = count;
+			this.count = Character.getNumericValue(ch);
 		}
 
 		public Direction getDirection() {
@@ -181,7 +216,11 @@ public class YajilinSolver {
 
 		@Override
 		public String toString() {
-			return direction.toString() + count;
+			return direction.toString() + (count > 10 ? ALPHABET.charAt(count - 10) : count);
+		}
+
+		public String toStringForweb() {
+			return direction.getDirectString() + count;
 		}
 
 		@Override
@@ -194,6 +233,11 @@ public class YajilinSolver {
 			return false;
 		}
 
+		@Override
+		public boolean isNotFixed() {
+			return false;
+		}
+
 	}
 
 	/**
@@ -203,8 +247,8 @@ public class YajilinSolver {
 		private final Masu[][] masu;
 
 		public Field(List<String> fieldStr) {
-			int width = fieldStr.get(0).length() / 2;
 			int height = fieldStr.size();
+			int width = fieldStr.get(0).length() / 2;
 			masu = new Masu[height][width];
 			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
 				String line = fieldStr.get(yIndex);
@@ -214,7 +258,33 @@ public class YajilinSolver {
 						masu[yIndex][xIndex] = MasuImpl.SPACE;
 					} else {
 						masu[yIndex][xIndex] = new Arrow(Direction.getByStr(oneMashStr.substring(0, 1)),
-								Integer.parseInt(oneMashStr.substring(1, 2)));
+								oneMashStr.charAt(1));
+					}
+				}
+			}
+		}
+
+		public Field(int height, int width, String param) {
+			masu = new Masu[height][width];
+			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
+					masu[yIndex][xIndex] = MasuImpl.SPACE;
+				}
+			}
+			int index = 0;
+			Direction direction = null;
+			for (int i = 0; i < param.length(); i++) {
+				char ch = param.charAt(i);
+				int interval = ALPHABET.indexOf(ch) + 1;
+				if (interval != 0) {
+					index = index + interval;
+				} else {
+					if (direction == null) {
+						direction = Direction.getByNum(Character.getNumericValue(ch));
+					} else {
+						masu[index / getXLength()][index % getXLength()] = new Arrow(direction, ch);
+						index++;
+						direction = null;
 					}
 				}
 			}
@@ -236,10 +306,24 @@ public class YajilinSolver {
 		public String toString() {
 			StringBuilder sb = new StringBuilder();
 			for (Masu[] line : masu) {
-				sb.append(System.lineSeparator());
 				for (Masu masu : line) {
 					sb.append(masu.toString());
 				}
+				sb.append(System.lineSeparator());
+			}
+			return sb.toString();
+		}
+
+		/**
+		 * 盤面の文字列表現を返す
+		*/
+		public String toStringForweb() {
+			StringBuilder sb = new StringBuilder();
+			for (Masu[] line : masu) {
+				for (Masu masu : line) {
+					sb.append(masu.toStringForweb());
+				}
+				sb.append(System.lineSeparator());
 			}
 			return sb.toString();
 		}
@@ -287,11 +371,7 @@ public class YajilinSolver {
 				// 矢印は調査対象外
 				return true;
 			}
-			Map<Direction, Masu> masuMap = new HashMap<>();
-			masuMap.put(Direction.UP, yIndex == 0 ? MasuImpl.WALL : masu[yIndex - 1][xIndex]);
-			masuMap.put(Direction.RIGHT, xIndex == getXLength() - 1 ? MasuImpl.WALL : masu[yIndex][xIndex + 1]);
-			masuMap.put(Direction.DOWN, yIndex == getYLength() - 1 ? MasuImpl.WALL : masu[yIndex + 1][xIndex]);
-			masuMap.put(Direction.LEFT, xIndex == 0 ? MasuImpl.WALL : masu[yIndex][xIndex - 1]);
+			Map<Direction, Masu> masuMap = getMasuMap(yIndex, xIndex);
 			if (nowMasu == MasuImpl.BLACK) {
 				for (Entry<Direction, Masu> entry : masuMap.entrySet()) {
 					if (entry.getValue() == MasuImpl.BLACK
@@ -304,7 +384,7 @@ public class YajilinSolver {
 			} else if (nowMasu == MasuImpl.NOT_BLACK) {
 				int cnt = 0;
 				for (Entry<Direction, Masu> entry : masuMap.entrySet()) {
-					if (entry.getValue() != MasuImpl.SPACE && entry.getValue() != MasuImpl.NOT_BLACK
+					if (!entry.getValue().isNotFixed()
 							&& !entry.getValue().getTargetDirection().contains(entry.getKey().opposite())) {
 						cnt++;
 					}
@@ -317,7 +397,7 @@ public class YajilinSolver {
 			} else {
 				for (Entry<Direction, Masu> entry : masuMap.entrySet()) {
 					if (nowMasu.getTargetDirection().contains(entry.getKey())) {
-						if (entry.getValue() != MasuImpl.SPACE && entry.getValue() != MasuImpl.NOT_BLACK
+						if (!entry.getValue().isNotFixed()
 								&& !entry.getValue().getTargetDirection().contains(entry.getKey().opposite())) {
 							// 自分が向いている方向にあるマスが自分向きまたはスペースでなければならない
 							return false;
@@ -373,6 +453,18 @@ public class YajilinSolver {
 		}
 
 		/**
+		 * 自分のマスの前後左右を取得する
+		 */
+		private Map<Direction, Masu> getMasuMap(int yIndex, int xIndex) {
+			Map<Direction, Masu> masuMap = new HashMap<>();
+			masuMap.put(Direction.UP, yIndex == 0 ? MasuImpl.WALL : masu[yIndex - 1][xIndex]);
+			masuMap.put(Direction.RIGHT, xIndex == getXLength() - 1 ? MasuImpl.WALL : masu[yIndex][xIndex + 1]);
+			masuMap.put(Direction.DOWN, yIndex == getYLength() - 1 ? MasuImpl.WALL : masu[yIndex + 1][xIndex]);
+			masuMap.put(Direction.LEFT, xIndex == 0 ? MasuImpl.WALL : masu[yIndex][xIndex - 1]);
+			return masuMap;
+		}
+
+		/**
 		 * 全てのマスを調査し、候補を確定する。
 		 * もし、何も置けないマスを発見したら、falseを返す。
 		 */
@@ -397,7 +489,7 @@ public class YajilinSolver {
 				return true;
 			}
 			Masu nowMasu = masu[yIndex][xIndex];
-			if (nowMasu != MasuImpl.SPACE && nowMasu != MasuImpl.NOT_BLACK) {
+			if (!nowMasu.isNotFixed()) {
 				return true;
 			}
 			// 候補を1つずつ調査
@@ -434,7 +526,7 @@ public class YajilinSolver {
 			if (masuCand.size() == 1) {
 				// 候補が1つに絞れたら確定する。
 				masu[yIndex][xIndex] = masuCand.get(0);
-				// 隣接するスペースは黒マスでないことが確定する
+				// 出口のマスまたは黒マスに隣接するスペースは黒マスでないことが確定する
 				if (masu[yIndex][xIndex].isPath()) {
 					for (Direction direction : masu[yIndex][xIndex].getTargetDirection()) {
 						if (direction == Direction.UP) {
@@ -455,12 +547,32 @@ public class YajilinSolver {
 							}
 						}
 					}
+				} else if (masu[yIndex][xIndex] == MasuImpl.BLACK) {
+					for (Direction direction : Direction.values()) {
+						if (direction == Direction.UP) {
+							if (yIndex > 0 && masu[yIndex - 1][xIndex] == MasuImpl.SPACE) {
+								masu[yIndex - 1][xIndex] = MasuImpl.NOT_BLACK;
+							}
+						} else if (direction == Direction.RIGHT) {
+							if (xIndex < getXLength() - 1 && masu[yIndex][xIndex + 1] == MasuImpl.SPACE) {
+								masu[yIndex][xIndex + 1] = MasuImpl.NOT_BLACK;
+							}
+						} else if (direction == Direction.DOWN) {
+							if (yIndex < getYLength() - 1 && masu[yIndex + 1][xIndex] == MasuImpl.SPACE) {
+								masu[yIndex + 1][xIndex] = MasuImpl.NOT_BLACK;
+							}
+						} else if (direction == Direction.LEFT) {
+							if (xIndex > 0 && masu[yIndex][xIndex - 1] == MasuImpl.SPACE) {
+								masu[yIndex][xIndex - 1] = MasuImpl.NOT_BLACK;
+							}
+						}
+					}
 				}
 			}
 			return true;
 		}
 
-		public boolean serveyArrow(int recursiveCnt) {
+		public boolean serveyArrow(int recursiveCnt, int serveyLevel) {
 			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
 				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
 					if (!(masu[yIndex][xIndex] instanceof Arrow)) {
@@ -533,16 +645,15 @@ public class YajilinSolver {
 								virtual.masu[targetyIndex][targetxIndex] = MasuImpl.NOT_BLACK;
 							}
 						}
-
 						for (int i = 0; i < searchPositionList.size(); i++) {
 							int targetyIndex = searchPositionList.get(i).getyIndex();
 							int targetxIndex = searchPositionList.get(i).getxIndex();
 							// 仮置きしたうえでルール違反を調査
 							if (!virtual.oneIsOk(targetyIndex, targetxIndex) ||
-									!virtual.serveyOne(0, targetyIndex + 1, targetxIndex) ||
-									!virtual.serveyOne(0, targetyIndex, targetxIndex + 1) ||
-									!virtual.serveyOne(0, targetyIndex + 1, targetxIndex) ||
-									!virtual.serveyOne(0, targetyIndex, targetxIndex - 1)) {
+									!virtual.serveyOne(serveyLevel, targetyIndex + 1, targetxIndex) ||
+									!virtual.serveyOne(serveyLevel, targetyIndex, targetxIndex + 1) ||
+									!virtual.serveyOne(serveyLevel, targetyIndex + 1, targetxIndex) ||
+									!virtual.serveyOne(serveyLevel, targetyIndex, targetxIndex - 1)) {
 								isConflict = true;
 								break;
 							}
@@ -555,7 +666,7 @@ public class YajilinSolver {
 						// 再帰調査をする場合
 						if (recursiveCnt != 0) {
 							// 黒マスが置けなくなる組み合わせがあった場合候補から除外
-							if (!virtual.serveyArrow(recursiveCnt - 1)) {
+							if (!virtual.serveyArrow(recursiveCnt - 1, serveyLevel)) {
 								iterator.remove();
 							}
 						}
@@ -568,6 +679,25 @@ public class YajilinSolver {
 							Position pos = searchPositionList.get(i);
 							if (combination.get(0).contains(i)) {
 								masu[pos.getyIndex()][pos.getxIndex()] = MasuImpl.BLACK;
+								for (Direction direction : Direction.values()) {
+									if (direction == Direction.UP) {
+										if (pos.getyIndex() > 0 && masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
+											masu[pos.getyIndex() - 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.RIGHT) {
+										if (pos.getxIndex() < getXLength() - 1 && masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
+											masu[pos.getyIndex()][pos.getxIndex() + 1] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.DOWN) {
+										if (pos.getyIndex()  < getYLength() - 1 && masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
+											masu[pos.getyIndex() + 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.LEFT) {
+										if (pos.getxIndex() > 0 && masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
+											masu[pos.getyIndex()][pos.getxIndex() - 1] = MasuImpl.NOT_BLACK;
+										}
+									}
+								}
 							} else if (masu[pos.getyIndex()][pos.getxIndex()] == MasuImpl.SPACE) {
 								masu[pos.getyIndex()][pos.getxIndex()] = MasuImpl.NOT_BLACK;
 							}
@@ -586,6 +716,25 @@ public class YajilinSolver {
 							Position pos = searchPositionList.get(i);
 							if (candIdx.contains(i)) {
 								masu[pos.getyIndex()][pos.getxIndex()] = MasuImpl.BLACK;
+								for (Direction direction : Direction.values()) {
+									if (direction == Direction.UP) {
+										if (pos.getyIndex() > 0 && masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
+											masu[pos.getyIndex() - 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.RIGHT) {
+										if (pos.getxIndex() < getXLength() - 1 && masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
+											masu[pos.getyIndex()][pos.getxIndex() + 1] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.DOWN) {
+										if (pos.getyIndex()  < getYLength() - 1 && masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
+											masu[pos.getyIndex() + 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
+										}
+									} else if (direction == Direction.LEFT) {
+										if (pos.getxIndex() > 0 && masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
+											masu[pos.getyIndex()][pos.getxIndex() - 1] = MasuImpl.NOT_BLACK;
+										}
+									}
+								}
 							}
 						}
 						candIdx = null;
@@ -641,6 +790,10 @@ public class YajilinSolver {
 			}
 		}
 
+		public Masu[][] getMasu() {
+			return masu;
+		}
+
 		public int getYLength() {
 			return masu.length;
 		}
@@ -648,14 +801,27 @@ public class YajilinSolver {
 		public int getXLength() {
 			return masu[0].length;
 		}
+	}
 
+	private final Field field;
+
+	public YajilinSolver(List<String> args) {
+		field = new Field(args);
+	}
+
+	public YajilinSolver(int height, int width, String param) {
+		field = new Field(height, width, param);
+	}
+
+	public Field getField() {
+		return field;
 	}
 
 	/**
 	 * コマンドライン向けインターフェースです
 	 */
 	public static void main(String[] args) throws InterruptedException {
-		solve(Arrays.asList(args));
+		System.out.println(new YajilinSolver(Arrays.asList(args)).solve());
 	}
 
 	/**
@@ -668,9 +834,8 @@ public class YajilinSolver {
 	 * d2 ： 下矢印の2
 	 * l3 ： 左矢印の3
 	 */
-	public static void solve(List<String> args) {
+	public String solve() {
 		try {
-			Field field = new Field(args);
 			long startTime = System.nanoTime();
 			System.out.println(field);
 			int recursive = 0;
@@ -687,35 +852,57 @@ public class YajilinSolver {
 				System.out.println(field);
 				System.out.println();
 				System.out.println("time:" + ((System.nanoTime() - startTime) / 1000000));
+				if (field.isSolved()) {
+					break;
+				}
+				if (!field.toString().equals(before)) {
+					recursive = 0;
+					continue;
+				}
 				// 矢印マスの調査
-				if (!field.serveyArrow(recursive)) {
+				if (!field.serveyArrow(recursive, 0)) {
 					invalid = true;
 					break;
 				}
 				System.out.println(field);
 				System.out.println();
 				System.out.println("time:" + ((System.nanoTime() - startTime) / 1000000));
-				// 進捗がなければ再帰回数を増やしてチャレンジ
+				if (field.isSolved()) {
+					break;
+				}
+				if (!field.toString().equals(before)) {
+					recursive = 0;
+					continue;
+				}
+				if (recursive >= 2) {
+					// 再帰をある程度増やしてダメなら、ギブアップ…
+					break;
+				}
+				if (!field.serveyArrow(recursive, 1)) {
+					invalid = true;
+					break;
+				}
+				System.out.println(field);
+				System.out.println();
+				System.out.println("time:" + ((System.nanoTime() - startTime) / 1000000));
+				if (field.isSolved()) {
+					break;
+				}
 				if (field.toString().equals(before)) {
-					if (recursive >= 2) {
-						// 再帰をある程度増やしてダメなら、ギブアップ…
-						break;
-					}
 					recursive++;
 				} else {
 					recursive = 0;
 				}
 			}
 			if (invalid) {
-				System.out.println("なんかこの問題おかしくない？");
+				return "問題に矛盾がある可能性があります。途中経過を返します。";
 			} else if (field.isSolved()) {
-				System.out.println("解けました！");
+				return "解けました";
 			} else {
-				System.out.println("ギブアップ＞＜");
+				return "解けませんでした。途中経過を返します。";
 			}
 		} catch (Exception e) {
-			System.out.println("ありゃ？");
-			e.printStackTrace();
+			return "解いている途中で予期せぬエラーが発生しました。";
 		}
 	}
 
