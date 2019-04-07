@@ -58,18 +58,6 @@ public class PicrossSolver {
 			return result;
 		}
 
-		void setHorizonalLine(int y, List<MASU> result) {
-			for (int x = 0; x < masu[y].length; x++) {
-				masu[y][x] = result.get(x);
-			}
-		}
-
-		void setVerticalLine(int x, List<MASU> result) {
-			for (int y = 0; y < masu.length; y++) {
-				masu[y][x] = result.get(y);
-			}
-		}
-
 		List<Integer> getHorizonalHint(int y) {
 			return horizonalHints.get(y);
 		}
