@@ -92,7 +92,7 @@ public class YajilinSolver {
 		/** */
 		DOWN_LEFT("┐", Arrays.asList(new Direction[] { Direction.DOWN, Direction.LEFT }), true, false),
 		/** 外壁。 */
-		WALL("＊", new ArrayList<>(), false, false);
+		WALL("？", new ArrayList<>(), false, false);
 
 		private final String str;
 		private final List<Direction> targetDirection;
@@ -281,6 +281,11 @@ public class YajilinSolver {
 				} else {
 					if (direction == null) {
 						direction = Direction.getByNum(Character.getNumericValue(ch));
+						if (direction == null) {
+							masu[index / getXLength()][index % getXLength()] = MasuImpl.WALL;
+							index++;
+							i++;
+						}
 					} else {
 						masu[index / getXLength()][index % getXLength()] = new Arrow(direction, ch);
 						index++;
