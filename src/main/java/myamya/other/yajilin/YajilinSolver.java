@@ -1,4 +1,4 @@
-package myamya.other.yajilin;
+﻿package myamya.other.yajilin;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -349,20 +349,6 @@ public class YajilinSolver {
 		}
 
 		/**
-		 * 現在の盤面の状態がヤジリンのルール上問題ないかを調べる。
-		 */
-		public boolean isOk() {
-			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
-				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
-					if (!oneIsOk(yIndex, xIndex)) {
-						return false;
-					}
-				}
-			}
-			return true;
-		}
-
-		/**
 		 * 指定した座標がヤジリンのルール上問題ないかを調べる。
 		 */
 		private boolean oneIsOk(int yIndex, int xIndex) {
@@ -385,7 +371,6 @@ public class YajilinSolver {
 						return false;
 					}
 				}
-				return true;
 			} else if (nowMasu == MasuImpl.NOT_BLACK) {
 				int cnt = 0;
 				for (Entry<Direction, Masu> entry : masuMap.entrySet()) {
@@ -398,7 +383,6 @@ public class YajilinSolver {
 				if (cnt > 2) {
 					return false;
 				}
-				return true;
 			} else {
 				for (Entry<Direction, Masu> entry : masuMap.entrySet()) {
 					if (nowMasu.getTargetDirection().contains(entry.getKey())) {
@@ -419,10 +403,11 @@ public class YajilinSolver {
 				Position firstPosition = new Position(yIndex, xIndex);
 				Position position = new Position(yIndex, xIndex);
 				Direction from = nowMasu.getTargetDirection().get(0).opposite();
+				boolean isLoop = false;
 				while (true) {
 					Masu rootingMasu = masu[position.getyIndex()][position.getxIndex()];
 					if (!rootingMasu.isPath()) {
-						return true;
+						break;
 					}
 					Direction nextDirection = rootingMasu.getTargetDirection().get(0) != from
 							? rootingMasu.getTargetDirection().get(0)
@@ -440,21 +425,67 @@ public class YajilinSolver {
 					root.add(position);
 					if (firstPosition.equals(position)) {
 						// 閉路が完成
+						isLoop = true;
 						break;
 					}
 				}
-				for (int y = 0; y < getYLength(); y++) {
-					for (int x = 0; x < getXLength(); x++) {
-						Masu checkMasu = masu[y][x];
-						if (checkMasu.isPath()
-								&& !root.contains(new Position(y, x))) {
-							// 閉路に含まれない道があればアウト
-							return false;
+				if (isLoop) {
+					for (int y = 0; y < getYLength(); y++) {
+						for (int x = 0; x < getXLength(); x++) {
+							Masu checkMasu = masu[y][x];
+							if (checkMasu.isPath()
+									&& !root.contains(new Position(y, x))) {
+								// 閉路に含まれない道があればアウト
+								return false;
+							}
 						}
 					}
 				}
-				return true;
 			}
+			// 偶数判定
+			boolean checkEven = true;
+			int left = 0;
+			int right = 0;
+			for (int y = 0; y < getYLength(); y++) {
+				Masu checkMasu = masu[y][xIndex];
+				if (checkMasu == MasuImpl.SPACE || checkMasu == MasuImpl.NOT_BLACK) {
+					checkEven = false;
+					break;
+				}
+				if (checkMasu == MasuImpl.UP_LEFT || checkMasu == MasuImpl.DOWN_LEFT
+						|| checkMasu == MasuImpl.RIGHT_LEFT) {
+					left++;
+				}
+				if (checkMasu == MasuImpl.UP_RIGHT || checkMasu == MasuImpl.RIGHT_DOWN
+						|| checkMasu == MasuImpl.RIGHT_LEFT) {
+					right++;
+				}
+			}
+			if (checkEven && (left % 2 != 0 || right % 2 != 0)) {
+				return false;
+			}
+			checkEven = true;
+			int up = 0;
+			int down = 0;
+			for (int x = 0; x < getXLength(); x++) {
+				Masu checkMasu = masu[yIndex][x];
+				if (checkMasu == MasuImpl.SPACE || checkMasu == MasuImpl.NOT_BLACK) {
+					checkEven = false;
+					break;
+				}
+				if (checkMasu == MasuImpl.UP_LEFT || checkMasu == MasuImpl.UP_RIGHT
+						|| checkMasu == MasuImpl.UP_DOWN) {
+					up++;
+				}
+				if (checkMasu == MasuImpl.DOWN_LEFT || checkMasu == MasuImpl.RIGHT_DOWN
+						|| checkMasu == MasuImpl.UP_DOWN) {
+					down++;
+				}
+			}
+			if (checkEven && (up % 2 != 0 || down % 2 != 0)) {
+				return false;
+			}
+			return true;
 		}
 
 		/**
@@ -655,7 +686,7 @@ public class YajilinSolver {
 							int targetxIndex = searchPositionList.get(i).getxIndex();
 							// 仮置きしたうえでルール違反を調査
 							if (!virtual.oneIsOk(targetyIndex, targetxIndex) ||
-									!virtual.serveyOne(serveyLevel, targetyIndex + 1, targetxIndex) ||
+									!virtual.serveyOne(serveyLevel, targetyIndex - 1, targetxIndex) ||
 									!virtual.serveyOne(serveyLevel, targetyIndex, targetxIndex + 1) ||
 									!virtual.serveyOne(serveyLevel, targetyIndex + 1, targetxIndex) ||
 									!virtual.serveyOne(serveyLevel, targetyIndex, targetxIndex - 1)) {
@@ -686,19 +717,23 @@ public class YajilinSolver {
 								masu[pos.getyIndex()][pos.getxIndex()] = MasuImpl.BLACK;
 								for (Direction direction : Direction.values()) {
 									if (direction == Direction.UP) {
-										if (pos.getyIndex() > 0 && masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
+										if (pos.getyIndex() > 0
+												&& masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
 											masu[pos.getyIndex() - 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.RIGHT) {
-										if (pos.getxIndex() < getXLength() - 1 && masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
+										if (pos.getxIndex() < getXLength() - 1
+												&& masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
 											masu[pos.getyIndex()][pos.getxIndex() + 1] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.DOWN) {
-										if (pos.getyIndex()  < getYLength() - 1 && masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
+										if (pos.getyIndex() < getYLength() - 1
+												&& masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
 											masu[pos.getyIndex() + 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.LEFT) {
-										if (pos.getxIndex() > 0 && masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
+										if (pos.getxIndex() > 0
+												&& masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
 											masu[pos.getyIndex()][pos.getxIndex() - 1] = MasuImpl.NOT_BLACK;
 										}
 									}
@@ -723,19 +758,23 @@ public class YajilinSolver {
 								masu[pos.getyIndex()][pos.getxIndex()] = MasuImpl.BLACK;
 								for (Direction direction : Direction.values()) {
 									if (direction == Direction.UP) {
-										if (pos.getyIndex() > 0 && masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
+										if (pos.getyIndex() > 0
+												&& masu[pos.getyIndex() - 1][pos.getxIndex()] == MasuImpl.SPACE) {
 											masu[pos.getyIndex() - 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.RIGHT) {
-										if (pos.getxIndex() < getXLength() - 1 && masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
+										if (pos.getxIndex() < getXLength() - 1
+												&& masu[pos.getyIndex()][pos.getxIndex() + 1] == MasuImpl.SPACE) {
 											masu[pos.getyIndex()][pos.getxIndex() + 1] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.DOWN) {
-										if (pos.getyIndex()  < getYLength() - 1 && masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
+										if (pos.getyIndex() < getYLength() - 1
+												&& masu[pos.getyIndex() + 1][pos.getxIndex()] == MasuImpl.SPACE) {
 											masu[pos.getyIndex() + 1][pos.getxIndex()] = MasuImpl.NOT_BLACK;
 										}
 									} else if (direction == Direction.LEFT) {
-										if (pos.getxIndex() > 0 && masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
+										if (pos.getxIndex() > 0
+												&& masu[pos.getyIndex()][pos.getxIndex() - 1] == MasuImpl.SPACE) {
 											masu[pos.getyIndex()][pos.getxIndex() - 1] = MasuImpl.NOT_BLACK;
 										}
 									}
