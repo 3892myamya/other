@@ -1,4 +1,4 @@
-﻿package myamya.other.yajilin;
+package myamya.other.yajilin;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -151,6 +151,11 @@ public class YajilinSolver {
 
 	static class Position {
 
+		@Override
+		public String toString() {
+			return "Position [yIndex=" + yIndex + ", xIndex=" + xIndex + "]";
+		}
+
 		private final int yIndex;
 		private final int xIndex;
 
@@ -287,7 +292,11 @@ public class YajilinSolver {
 							i++;
 						}
 					} else {
-						masu[index / getXLength()][index % getXLength()] = new Arrow(direction, ch);
+						if (Character.getNumericValue(ch) != -1) {
+							masu[index / getXLength()][index % getXLength()] = new Arrow(direction, ch);
+						} else {
+							masu[index / getXLength()][index % getXLength()] = MasuImpl.WALL;
+						}
 						index++;
 						direction = null;
 					}
@@ -358,8 +367,8 @@ public class YajilinSolver {
 			}
 			// 各方向にあるマスをマッピング
 			Masu nowMasu = masu[yIndex][xIndex];
-			if (nowMasu instanceof Arrow) {
-				// 矢印は調査対象外
+			if (nowMasu instanceof Arrow || nowMasu == MasuImpl.WALL) {
+				// 矢印、？マスは調査対象外
 				return true;
 			}
 			Map<Direction, Masu> masuMap = getMasuMap(yIndex, xIndex);
@@ -608,9 +617,10 @@ public class YajilinSolver {
 			return true;
 		}
 
-		public boolean serveyArrow(int recursiveCnt, int serveyLevel) {
-			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
-				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
+		public boolean serveyArrow(int recursiveCnt, int serveyLevel, int yStart, int xStart) {
+			for (int yIndex = yStart; yIndex < getYLength(); yIndex++) {
+				for (int xIndex = xStart; xIndex < getXLength(); xIndex++) {
+					xStart = 0;
 					if (!(masu[yIndex][xIndex] instanceof Arrow)) {
 						// 矢印以外であれば調査対象外
 						continue;
@@ -702,7 +712,7 @@ public class YajilinSolver {
 						// 再帰調査をする場合
 						if (recursiveCnt != 0) {
 							// 黒マスが置けなくなる組み合わせがあった場合候補から除外
-							if (!virtual.serveyArrow(recursiveCnt - 1, serveyLevel)) {
+							if (!virtual.serveyArrow(recursiveCnt - 1, serveyLevel, yIndex, xIndex)) {
 								iterator.remove();
 							}
 						}
@@ -888,8 +898,9 @@ public class YajilinSolver {
 			while (!field.isSolved()) {
 				System.out.println("recursive:" + recursive);
 				before = field.toString();
+				System.out.println("servey masu...");
 				// 確定マスの調査
-				if (!field.serveyAll(recursive + 2)) {
+				if (!field.serveyAll(recursive + 1)) {
 					invalid = true;
 					break;
 				}
@@ -903,26 +914,28 @@ public class YajilinSolver {
 					recursive = 0;
 					continue;
 				}
-				// 矢印マスの調査
-				if (!field.serveyArrow(recursive, 0)) {
-					invalid = true;
-					break;
-				}
-				System.out.println(field);
-				System.out.println();
-				System.out.println("time:" + ((System.nanoTime() - startTime) / 1000000));
-				if (field.isSolved()) {
-					break;
-				}
-				if (!field.toString().equals(before)) {
-					recursive = 0;
-					continue;
-				}
-				if (recursive >= 2) {
+				if (recursive >= 3) {
 					// 再帰をある程度増やしてダメなら、ギブアップ…
 					break;
 				}
-				if (!field.serveyArrow(recursive, 1)) {
+				// 矢印マスの調査
+				System.out.println("servey arrow...");
+				if (!field.serveyArrow(recursive, 0, 0, 0)) {
+					invalid = true;
+					break;
+				}
+				System.out.println(field);
+				System.out.println();
+				System.out.println("time:" + ((System.nanoTime() - startTime) / 1000000));
+				if (field.isSolved()) {
+					break;
+				}
+				if (!field.toString().equals(before)) {
+					recursive = 0;
+					continue;
+				}
+				System.out.println("servey arrow recursive...");
+				if (!field.serveyArrow(recursive, (recursive >= 2) ? 2 : 1, 0, 0)) {
 					invalid = true;
 					break;
 				}
@@ -946,6 +959,7 @@ public class YajilinSolver {
 				return "解けませんでした。途中経過を返します。";
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			return "解いている途中で予期せぬエラーが発生しました。";
 		}
 	}

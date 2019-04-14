@@ -70,9 +70,8 @@ public class YajilinWeb extends HttpServlet {
 						parts.get(parts.size() - 1));
 				//			List<String> args = Arrays.asList(request.getParameter("args").split("\n"));
 				//			YajirinSolveThlead t = new YajirinSolveThlead(args);
-
 				t.start();
-				t.join(27000);
+				t.join(28000);
 				resultMap.put("result", makeCambus(t.getResult()));
 				resultMap.put("status", t.getStatus());
 			}
