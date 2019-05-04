@@ -1,4 +1,4 @@
-package myamya.other.yajilin;
+package myamya.other.solver.yajilin;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,7 +11,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-public class YajilinSolver {
+import myamya.other.solver.Solver;
+
+public class YajilinSolver implements Solver {
 
 	static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
 
@@ -136,7 +138,7 @@ public class YajilinSolver {
 	/**
 	 * 1マスを示すクラス
 	 */
-	interface Masu {
+	public interface Masu {
 		/**
 		 * 自分が向いている方向リスト
 		 */
@@ -248,7 +250,7 @@ public class YajilinSolver {
 	/**
 	 * 盤面全体
 	 */
-	static class Field {
+	public static class Field {
 		private final Masu[][] masu;
 
 		public Field(List<String> fieldStr) {
@@ -408,7 +410,7 @@ public class YajilinSolver {
 					}
 				}
 				// 閉路チェック
-				List<Position> root = new ArrayList<>();
+				Set<Position> root = new HashSet<>();
 				Position firstPosition = new Position(yIndex, xIndex);
 				Position position = new Position(yIndex, xIndex);
 				Direction from = nowMasu.getTargetDirection().get(0).opposite();
@@ -859,23 +861,12 @@ public class YajilinSolver {
 
 	private final Field field;
 
-	public YajilinSolver(List<String> args) {
-		field = new Field(args);
-	}
-
 	public YajilinSolver(int height, int width, String param) {
 		field = new Field(height, width, param);
 	}
 
 	public Field getField() {
 		return field;
-	}
-
-	/**
-	 * コマンドライン向けインターフェースです
-	 */
-	public static void main(String[] args) throws InterruptedException {
-		System.out.println(new YajilinSolver(Arrays.asList(args)).solve());
 	}
 
 	/**
