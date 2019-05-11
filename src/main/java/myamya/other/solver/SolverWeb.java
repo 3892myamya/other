@@ -1,7 +1,12 @@
 package myamya.other.solver;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
+import java.net.ProtocolException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -141,25 +146,24 @@ public class SolverWeb extends HttpServlet {
 		response.setContentType("text/javascript; charset=utf-8");
 		Map<String, Object> resultMap = new HashMap<>();
 		try {
-			List<String> parts = Arrays.asList(request.getParameter("url").split("/"));
+			List<String> parts = getURLparts(request.getParameter("url"));
 			int height = Integer.parseInt(parts.get(parts.size() - 2));
 			int width = Integer.parseInt(parts.get(parts.size() - 3));
 			String puzzleType = parts.get(parts.size() - 4);
-			if (puzzleType.contains("yajilin")) {
+			String param = parts.get(parts.size() - 1).split("@")[0];
+			if (puzzleType.contains("yajilin") || puzzleType.contains("yajirin")) {
 				if (height * width > 400) {
 					resultMap.put("result", "");
 					resultMap.put("status", "申し訳ございません。401マス以上ある問題は解くことができません。");
 				} else {
-					YajirinSolveThlead t = new YajirinSolveThlead(height, width,
-							parts.get(parts.size() - 1));
+					YajirinSolveThlead t = new YajirinSolveThlead(height, width, param);
 					t.start();
 					t.join(28000);
 					resultMap.put("result", t.makeCambus());
 					resultMap.put("status", t.getStatus());
 				}
 			} else if (puzzleType.contains("nurikabe")) {
-				NurikabeSolverThread t = new NurikabeSolverThread(height, width,
-						parts.get(parts.size() - 1));
+				NurikabeSolverThread t = new NurikabeSolverThread(height, width, param);
 				t.start();
 				t.join(28000);
 				resultMap.put("result", t.makeCambus());
@@ -175,5 +179,38 @@ public class SolverWeb extends HttpServlet {
 		try (PrintWriter out = response.getWriter()) {
 			out.print(JSON.encode(resultMap));
 		}
+	}
+
+	private final String SCRAPING_TARGET = "<iframe src=\"";
+
+	private List<String> getURLparts(String urlStr) throws ProtocolException, IOException {
+		List<String> parts = Arrays.asList(urlStr.split("/"));
+		if (parts.get(2).equals("puzsq.sakura.ne.jp")) {
+			// URLがパズルスクエアだったら、スクレイピングしてぱずぷれのURLを抽出
+			URL url = new URL(urlStr);
+			try (BufferedReader reader = getReader(url)) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					int idx = line.indexOf(SCRAPING_TARGET);
+					if (idx != -1) {
+						String pzprURLStr = line.substring(idx + SCRAPING_TARGET.length()).split("\"")[0];
+						return getURLparts(pzprURLStr);
+					}
+				}
+				throw new IllegalStateException();
+			}
+		} else {
+			return parts;
+		}
+	}
+
+	/**
+	 * urlのリーダーを取得します。
+	 */
+	public static BufferedReader getReader(URL url) throws IOException, ProtocolException {
+		HttpURLConnection http = (HttpURLConnection) url.openConnection();
+		http.setRequestMethod("GET");
+		http.connect();
+		return new BufferedReader(new InputStreamReader(http.getInputStream(), "UTF-8"));
 	}
 }
