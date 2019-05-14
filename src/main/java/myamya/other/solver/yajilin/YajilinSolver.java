@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import myamya.other.solver.Common.Position;
 import myamya.other.solver.Solver;
 
 public class YajilinSolver implements Solver {
@@ -149,56 +150,6 @@ public class YajilinSolver implements Solver {
 		boolean isNotFixed();
 
 		Object toStringForweb();
-	}
-
-	static class Position {
-
-		@Override
-		public String toString() {
-			return "Position [yIndex=" + yIndex + ", xIndex=" + xIndex + "]";
-		}
-
-		private final int yIndex;
-		private final int xIndex;
-
-		public Position(int yIndex, int xIndex) {
-			this.yIndex = yIndex;
-			this.xIndex = xIndex;
-		}
-
-		public int getyIndex() {
-			return yIndex;
-		}
-
-		public int getxIndex() {
-			return xIndex;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + xIndex;
-			result = prime * result + yIndex;
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			Position other = (Position) obj;
-			if (xIndex != other.xIndex)
-				return false;
-			if (yIndex != other.yIndex)
-				return false;
-			return true;
-		}
-
 	}
 
 	/**

@@ -10,67 +10,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import myamya.other.solver.Common.Position;
 import myamya.other.solver.Solver;
 import myamya.other.solver.nurikabe.NurikabeSolver.Masu.NotBlackMasu;
 import myamya.other.solver.nurikabe.NurikabeSolver.Masu.NumberMasu;
 
 public class NurikabeSolver implements Solver {
-	static class Position {
-
-		@Override
-		public String toString() {
-			return "[y=" + yIndex + ", x=" +
-					xIndex + "]";
-		}
-
-		private final int yIndex;
-		private final int xIndex;
-
-		public Position(int yIndex, int xIndex) {
-			this.yIndex = yIndex;
-			this.xIndex = xIndex;
-		}
-
-		public int getyIndex() {
-			return yIndex;
-		}
-
-		public int getxIndex() {
-			return xIndex;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + xIndex;
-			result = prime * result + yIndex;
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			Position other = (Position) obj;
-			if (xIndex != other.xIndex)
-				return false;
-			if (yIndex != other.yIndex)
-				return false;
-			return true;
-		}
-
-	}
 
 	/**
 	 * 方向を示す列挙型
 	 */
 	enum Direction {
-		UP("u", 1, "↑"), RIGHT("r", 4, "→"), DOWN("d", 2, "↓"), LEFT("l", 3, "←");
+	UP("u", 1, "↑"), RIGHT("r", 4, "→"), DOWN("d", 2, "↓"), LEFT("l", 3, "←");
 		private final String str;
 		private final int num;
 		private final String directString;
