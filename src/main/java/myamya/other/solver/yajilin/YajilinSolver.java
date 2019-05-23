@@ -11,69 +11,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import myamya.other.solver.Common.Direction;
 import myamya.other.solver.Common.Position;
 import myamya.other.solver.Solver;
 
 public class YajilinSolver implements Solver {
 
 	static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
-
-	/**
-	 * 方向を示す列挙型
-	 */
-	enum Direction {
-		UP("u", 1, "↑"), RIGHT("r", 4, "→"), DOWN("d", 2, "↓"), LEFT("l", 3, "←");
-		private final String str;
-		private final int num;
-		private final String directString;
-
-		Direction(String str, int num, String directString) {
-			this.str = str;
-			this.num = num;
-			this.directString = directString;
-		}
-
-		@Override
-		public String toString() {
-			return str;
-		}
-
-		public Direction opposite() {
-			if (this == UP) {
-				return DOWN;
-			} else if (this == RIGHT) {
-				return LEFT;
-			} else if (this == DOWN) {
-				return UP;
-			} else if (this == LEFT) {
-				return RIGHT;
-			} else {
-				return null;
-			}
-		}
-
-		public static Direction getByStr(String str) {
-			for (Direction one : Direction.values()) {
-				if (one.toString().equals(str)) {
-					return one;
-				}
-			}
-			return null;
-		}
-
-		public static Direction getByNum(int num) {
-			for (Direction one : Direction.values()) {
-				if (one.num == num) {
-					return one;
-				}
-			}
-			return null;
-		}
-
-		public String getDirectString() {
-			return directString;
-		}
-	}
 
 	enum MasuImpl implements Masu {
 		/** 白マス */

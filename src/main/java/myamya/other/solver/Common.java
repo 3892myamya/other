@@ -1,6 +1,47 @@
 package myamya.other.solver;
 
 public class Common {
+	public enum Masu {
+		SPACE("　"), BLACK("■"), NOT_BLACK("・");
+
+		String str;
+
+		Masu(String str) {
+			this.str = str;
+		}
+
+		@Override
+		public String toString() {
+			return str;
+		}
+	}
+
+	public enum Difficulty {
+		RAKURAKU("らくらく", 0), OTEGORO("おてごろ", 1), TAIHEN("たいへん", 2), AZEN("アゼン", 3);
+
+		String str;
+		int val;
+
+		Difficulty(String str, int val) {
+			this.str = str;
+			this.val = val;
+		}
+
+		@Override
+		public String toString() {
+			return str;
+		}
+
+		public static Difficulty getByVal(int val) {
+			for (Difficulty one : Difficulty.values()) {
+				if (one.val == val) {
+					return one;
+				}
+			}
+			return null;
+		}
+	}
+
 	public static class Position {
 
 		@Override
