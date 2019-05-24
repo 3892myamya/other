@@ -23,6 +23,7 @@ import myamya.other.solver.heyawake.HeyawakeSolver;
 import myamya.other.solver.lits.LitsSolver;
 import myamya.other.solver.norinori.NorinoriSolver;
 import myamya.other.solver.nurikabe.NurikabeSolver;
+import myamya.other.solver.nurikabe.NurikabeSolver.Room;
 import myamya.other.solver.stostone.StostoneSolver;
 import myamya.other.solver.yajilin.YajilinSolver;
 import net.arnx.jsonic.JSON;
@@ -96,6 +97,9 @@ public class SolverWeb extends HttpServlet {
 	}
 
 	static class NurikabeSolverThread extends AbsSolveThlead {
+		private static final String HALF_NUMS = "0 1 2 3 4 5 6 7 8 9";
+		private static final String FULL_NUMS = "０１２３４５６７８９";
+
 		NurikabeSolverThread(int height, int width, String param) {
 			super(height, width, param);
 		}
@@ -115,7 +119,7 @@ public class SolverWeb extends HttpServlet {
 							+ (field.getXLength() * baseSize + baseSize) + "\" >");
 			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
 				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
-					NurikabeSolver.Masu oneMasu = field.getMasu()[yIndex][xIndex];
+					Common.Masu oneMasu = field.getMasu()[yIndex][xIndex];
 					if (oneMasu.toString().equals("■")) {
 						sb.append("<rect y=\"" + (yIndex * baseSize)
 								+ "\" x=\""
@@ -127,6 +131,25 @@ public class SolverWeb extends HttpServlet {
 								+ "\">"
 								+ "</rect>");
 					} else {
+						String masuStr = null;
+						for (Room room : field.rooms) {
+							if (room.getPivot().equals(new Position(yIndex, xIndex))) {
+								if (room.getCapacity() > 99) {
+									masuStr = "99";
+								}
+								String capacityStr = String.valueOf(room.getCapacity());
+								int index = HALF_NUMS.indexOf(capacityStr);
+								if (index >= 0) {
+									masuStr = FULL_NUMS.substring(index / 2, index / 2 + 1);
+								} else {
+									masuStr = capacityStr;
+								}
+								break;
+							}
+						}
+						if (masuStr == null) {
+							masuStr = oneMasu.toString();
+						}
 						sb.append("<text y=\"" + (yIndex * baseSize + baseSize - 4)
 								+ "\" x=\""
 								+ (xIndex * baseSize + baseSize)
@@ -135,7 +158,7 @@ public class SolverWeb extends HttpServlet {
 								+ "\" textLength=\""
 								+ (baseSize - 2)
 								+ "\" lengthAdjust=\"spacingAndGlyphs\">"
-								+ oneMasu.toString()
+								+ masuStr
 								+ "</text>");
 					}
 				}

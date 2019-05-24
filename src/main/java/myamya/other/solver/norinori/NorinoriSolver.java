@@ -17,7 +17,7 @@ public class NorinoriSolver implements Solver {
 		static final int BLACK_CNT = 2;
 
 		// マスの情報
-		private final Masu[][] masu;
+		private Masu[][] masu;
 		// 横をふさぐ壁が存在するか
 		// 0,0 = trueなら、0,0と0,1の間に壁があるという意味
 		private final boolean[][] yokoWall;
@@ -216,6 +216,16 @@ public class NorinoriSolver implements Solver {
 				sb.append("□");
 			}
 			sb.append(System.lineSeparator());
+			return sb.toString();
+		}
+
+		public String getStateDump() {
+			StringBuilder sb = new StringBuilder();
+			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
+					sb.append(masu[yIndex][xIndex]);
+				}
+			}
 			return sb.toString();
 		}
 
@@ -453,19 +463,20 @@ public class NorinoriSolver implements Solver {
 		long start = System.nanoTime();
 		while (!field.isSolved()) {
 			System.out.println(field);
-			String befStr = field.toString();
-			if (!solveAndCheck(field)) {
+			String befStr = field.getStateDump();
+			if (!solveAndCheck(field)
+					|| (!befStr.equals(field.getStateDump()) && !solveAndCheck(field))) {
 				return "問題に矛盾がある可能性があります。途中経過を返します。";
 			}
 			int recursiveCnt = 0;
-			while (field.toString().equals(befStr) && recursiveCnt < 3) {
+			while (field.getStateDump().equals(befStr) && recursiveCnt < 3) {
 				difficulty = difficulty <= recursiveCnt ? recursiveCnt + 1 : difficulty;
 				if (!candSolve(field, recursiveCnt)) {
 					return "問題に矛盾がある可能性があります。途中経過を返します。";
 				}
 				recursiveCnt++;
 			}
-			if (recursiveCnt == 3 && field.toString().equals(befStr)) {
+			if (recursiveCnt == 3 && field.getStateDump().equals(befStr)) {
 				return "解けませんでした。途中経過を返します。";
 			}
 		}
@@ -514,28 +525,30 @@ public class NorinoriSolver implements Solver {
 		if (field.masu[yIndex][xIndex] == Masu.SPACE) {
 			Field virtual = new Field(field);
 			virtual.masu[yIndex][xIndex] = Masu.BLACK;
-			boolean allowBlack = solveAndCheck(virtual);
-			allowBlack = solveAndCheck(virtual);
+			String befStr = virtual.getStateDump();
+			boolean allowBlack = solveAndCheck(virtual)
+					&& (befStr.equals(virtual.getStateDump()) || solveAndCheck(virtual));
 			if (allowBlack && recursive > 0) {
 				if (!candSolve(virtual, recursive - 1)) {
 					allowBlack = false;
 				}
 			}
-			virtual = new Field(field);
-			virtual.masu[yIndex][xIndex] = Masu.NOT_BLACK;
-			boolean allowNotBlack = solveAndCheck(virtual);
-			allowNotBlack = solveAndCheck(virtual);
+			Field virtual2 = new Field(field);
+			virtual2.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+			befStr = virtual2.getStateDump();
+			boolean allowNotBlack = solveAndCheck(virtual2)
+					&& (befStr.equals(virtual2.getStateDump()) || solveAndCheck(virtual2));
 			if (allowNotBlack && recursive > 0) {
-				if (!candSolve(virtual, recursive - 1)) {
+				if (!candSolve(virtual2, recursive - 1)) {
 					allowNotBlack = false;
 				}
 			}
 			if (!allowBlack && !allowNotBlack) {
 				return false;
 			} else if (!allowBlack) {
-				field.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+				field.masu = virtual2.masu;
 			} else if (!allowNotBlack) {
-				field.masu[yIndex][xIndex] = Masu.BLACK;
+				field.masu = virtual.masu;
 			}
 		}
 		return true;

@@ -82,7 +82,7 @@ public class LitsSolver implements Solver {
 		static final int BLACK_CNT = 4;
 
 		// マスの情報
-		private final Masu[][] masu;
+		private Masu[][] masu;
 		// 横をふさぐ壁が存在するか
 		// 0,0 = trueなら、0,0と0,1の間に壁があるという意味
 		private final boolean[][] yokoWall;
@@ -323,6 +323,16 @@ public class LitsSolver implements Solver {
 			return sb.toString();
 		}
 
+		public String getStateDump() {
+			StringBuilder sb = new StringBuilder();
+			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
+					sb.append(masu[yIndex][xIndex]);
+				}
+			}
+			return sb.toString();
+		}
+
 		/**
 		 * 部屋のマスを埋める。黒マス不足・過剰はfalseを返す。
 		 */
@@ -524,16 +534,14 @@ public class LitsSolver implements Solver {
 
 		/**
 		 * posを起点に上下左右に白確定でないマスをつなげていく。壁は無視する。
-		 * つないだマスに黒マスを含んだらtrueを返す。
 		 */
-		private boolean setContinuePosSetIgnoreWall(Position pos, Set<Position> continuePosSet) {
-			boolean result = masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK;
+		private void setContinuePosSetIgnoreWall(Position pos, Set<Position> continuePosSet) {
 			if (pos.getyIndex() != 0) {
 				Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
 				if (!continuePosSet.contains(nextPos)
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
 					continuePosSet.add(nextPos);
-					result = setContinuePosSetIgnoreWall(nextPos, continuePosSet) || result;
+					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getxIndex() != getXLength() - 1) {
@@ -541,7 +549,7 @@ public class LitsSolver implements Solver {
 				if (!continuePosSet.contains(nextPos)
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
 					continuePosSet.add(nextPos);
-					result = setContinuePosSetIgnoreWall(nextPos, continuePosSet) || result;
+					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getyIndex() != getYLength() - 1) {
@@ -549,7 +557,7 @@ public class LitsSolver implements Solver {
 				if (!continuePosSet.contains(nextPos)
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
 					continuePosSet.add(nextPos);
-					result = setContinuePosSetIgnoreWall(nextPos, continuePosSet) || result;
+					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getxIndex() != 0) {
@@ -557,10 +565,9 @@ public class LitsSolver implements Solver {
 				if (!continuePosSet.contains(nextPos)
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
 					continuePosSet.add(nextPos);
-					result = setContinuePosSetIgnoreWall(nextPos, continuePosSet) || result;
+					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
 				}
 			}
-			return result;
 		}
 
 		public boolean isSolved() {
@@ -601,19 +608,20 @@ public class LitsSolver implements Solver {
 		long start = System.nanoTime();
 		while (!field.isSolved()) {
 			System.out.println(field);
-			String befStr = field.toString();
-			if (!solveAndCheck(field)) {
+			String befStr = field.getStateDump();
+			if (!solveAndCheck(field)
+					|| (!befStr.equals(field.getStateDump()) && !solveAndCheck(field))) {
 				return "問題に矛盾がある可能性があります。途中経過を返します。";
 			}
 			int recursiveCnt = 0;
-			while (field.toString().equals(befStr) && recursiveCnt < 3) {
+			while (field.getStateDump().equals(befStr) && recursiveCnt < 3) {
 				difficulty = difficulty <= recursiveCnt ? recursiveCnt + 1 : difficulty;
 				if (!candSolve(field, recursiveCnt)) {
 					return "問題に矛盾がある可能性があります。途中経過を返します。";
 				}
 				recursiveCnt++;
 			}
-			if (recursiveCnt == 3 && field.toString().equals(befStr)) {
+			if (recursiveCnt == 3 && field.getStateDump().equals(befStr)) {
 				return "解けませんでした。途中経過を返します。";
 			}
 		}
@@ -668,28 +676,30 @@ public class LitsSolver implements Solver {
 		if (field.masu[yIndex][xIndex] == Masu.SPACE) {
 			Field virtual = new Field(field);
 			virtual.masu[yIndex][xIndex] = Masu.BLACK;
-			boolean allowBlack = solveAndCheck(virtual);
-			allowBlack = solveAndCheck(virtual);
+			String befStr = virtual.getStateDump();
+			boolean allowBlack = solveAndCheck(virtual)
+					&& (befStr.equals(virtual.getStateDump()) || solveAndCheck(virtual));
 			if (allowBlack && recursive > 0) {
 				if (!candSolve(virtual, recursive - 1)) {
 					allowBlack = false;
 				}
 			}
-			virtual = new Field(field);
-			virtual.masu[yIndex][xIndex] = Masu.NOT_BLACK;
-			boolean allowNotBlack = solveAndCheck(virtual);
-			allowNotBlack = solveAndCheck(virtual);
+			Field virtual2 = new Field(field);
+			virtual2.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+			befStr = virtual2.getStateDump();
+			boolean allowNotBlack = solveAndCheck(virtual2)
+					&& (befStr.equals(virtual2.getStateDump()) || solveAndCheck(virtual2));
 			if (allowNotBlack && recursive > 0) {
-				if (!candSolve(virtual, recursive - 1)) {
+				if (!candSolve(virtual2, recursive - 1)) {
 					allowNotBlack = false;
 				}
 			}
 			if (!allowBlack && !allowNotBlack) {
 				return false;
 			} else if (!allowBlack) {
-				field.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+				field.masu = virtual2.masu;
 			} else if (!allowNotBlack) {
-				field.masu[yIndex][xIndex] = Masu.BLACK;
+				field.masu = virtual.masu;
 			}
 		}
 		return true;

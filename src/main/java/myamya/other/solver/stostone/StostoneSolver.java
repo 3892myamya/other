@@ -19,7 +19,7 @@ public class StostoneSolver implements Solver {
 		static final String ALPHABET_FROM_G = "ghijklmnopqrstuvwxyz";
 
 		// マスの情報
-		private final Masu[][] masu;
+		private Masu[][] masu;
 		// 横をふさぐ壁が存在するか
 		// 0,0 = trueなら、0,0と0,1の間に壁があるという意味
 		private final boolean[][] yokoWall;
@@ -244,43 +244,53 @@ public class StostoneSolver implements Solver {
 			}
 		}
 
-		// posを起点に上下左右に壁または白確定でないマスをposからのdistanceだけつなげていく。
-		private void setContinuePosSetUseDistance(Position pos, Set<Position> continuePosSet, int distance) {
-			if (distance == 0) {
+		/**
+		 * pivotPosSetを起点に上下左右に壁または白確定でないマスをpivotPosSetからのdistanceだけつなげていく。
+		 */
+		private void setContinuePosSetUseDistance(Set<Position> pivotPosSet, Set<Position> continuePosSet,
+				int distance) {
+			if (distance == 0 || pivotPosSet.isEmpty()) {
 				return;
 			}
-			if (pos.getyIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
-				if (!tateWall[pos.getyIndex() - 1][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
+			Set<Position> nextPivotPosSet = new HashSet<>();
+			for (Position pos : pivotPosSet) {
+				if (pos.getyIndex() != 0) {
+					Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
+					if (!tateWall[pos.getyIndex() - 1][pos.getxIndex()] && !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getxIndex() != getXLength() - 1) {
+					Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
+					if (!yokoWall[pos.getyIndex()][pos.getxIndex()]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getyIndex() != getYLength() - 1) {
+					Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
+					if (!tateWall[pos.getyIndex()][pos.getxIndex()]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getxIndex() != 0) {
+					Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
+					if (!yokoWall[pos.getyIndex()][pos.getxIndex() - 1]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
 				}
 			}
-			if (pos.getxIndex() != getXLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
-				if (!yokoWall[pos.getyIndex()][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
-			if (pos.getyIndex() != getYLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
-				if (!tateWall[pos.getyIndex()][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
-			if (pos.getxIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
-				if (!yokoWall[pos.getyIndex()][pos.getxIndex() - 1]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
+			setContinuePosSetUseDistance(nextPivotPosSet, continuePosSet, distance - 1);
 		}
 
 		/**
@@ -330,7 +340,6 @@ public class StostoneSolver implements Solver {
 							//その黒は接地している
 							isDropped = true;
 						} else if (droppedBlackPos
-
 								.contains(new Position(pos.getyIndex() + 1 + dropDistance,
 										pos.getxIndex()))) {
 							// 別の部屋の黒マスと密着している
@@ -340,13 +349,10 @@ public class StostoneSolver implements Solver {
 							// 黒マス落下距離確定
 							Set<Position> blackSet = new HashSet<>();
 							blackSet.add(pos);
-
 							setBlackGroupPosSet(pos, blackSet);
 							for (Position blackPos : blackSet) {
 								positionMap.put(blackPos, dropDistance);
-
 								droppedBlackPos
-
 										.add(new Position(blackPos.getyIndex() + dropDistance,
 												blackPos.getxIndex()));
 							}
@@ -371,8 +377,7 @@ public class StostoneSolver implements Solver {
 						!tateWall[pos.getyIndex() - 1][pos.getxIndex()]
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] == Masu.BLACK) {
 					blackSet.add(nextPos);
-					setBlackGroupPosSet(nextPos,
-							blackSet);
+					setBlackGroupPosSet(nextPos, blackSet);
 				}
 			}
 			if (pos.getxIndex() != getXLength() - 1) {
@@ -381,8 +386,7 @@ public class StostoneSolver implements Solver {
 						!yokoWall[pos.getyIndex()][pos.getxIndex()]
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] == Masu.BLACK) {
 					blackSet.add(nextPos);
-					setBlackGroupPosSet(nextPos,
-							blackSet);
+					setBlackGroupPosSet(nextPos, blackSet);
 				}
 			}
 			if (pos.getyIndex() != getYLength() - 1) {
@@ -391,8 +395,7 @@ public class StostoneSolver implements Solver {
 						!tateWall[pos.getyIndex()][pos.getxIndex()]
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] == Masu.BLACK) {
 					blackSet.add(nextPos);
-					setBlackGroupPosSet(nextPos,
-							blackSet);
+					setBlackGroupPosSet(nextPos, blackSet);
 				}
 			}
 			if (pos.getxIndex() != 0) {
@@ -401,8 +404,7 @@ public class StostoneSolver implements Solver {
 						!yokoWall[pos.getyIndex()][pos.getxIndex() - 1]
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] == Masu.BLACK) {
 					blackSet.add(nextPos);
-					setBlackGroupPosSet(nextPos,
-							blackSet);
+					setBlackGroupPosSet(nextPos, blackSet);
 				}
 			}
 		}
@@ -442,6 +444,16 @@ public class StostoneSolver implements Solver {
 				sb.append("□");
 			}
 			sb.append(System.lineSeparator());
+			return sb.toString();
+		}
+
+		public String getStateDump() {
+			StringBuilder sb = new StringBuilder();
+			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
+					sb.append(masu[yIndex][xIndex]);
+				}
+			}
 			return sb.toString();
 		}
 
@@ -632,11 +644,11 @@ public class StostoneSolver implements Solver {
 						}
 						Set<Position> continuePosSet = new HashSet<>();
 						continuePosSet.add(pos);
-						if (room.getBlackCnt() == -1 || room.getBlackCnt() >= 5) {
+						if (room.getBlackCnt() == -1) {
 							setContinuePosSet(pos, continuePosSet);
 						} else {
-							// TODO 部屋の黒マス数が多いと逆に遅くなるので要改善。暫定で5以上なら↑でやってる
-							setContinuePosSetUseDistance(pos, continuePosSet, room.getBlackCnt() - 1);
+							setContinuePosSetUseDistance(new HashSet<>(continuePosSet), continuePosSet,
+									room.getBlackCnt() - 1);
 						}
 						alreadySurvey.addAll(continuePosSet);
 					}
@@ -724,19 +736,20 @@ public class StostoneSolver implements Solver {
 		long start = System.nanoTime();
 		while (!field.isSolved()) {
 			System.out.println(field);
-			String befStr = field.toString();
-			if (!solveAndCheck(field)) {
+			String befStr = field.getStateDump();
+			if (!solveAndCheck(field)
+					|| (!befStr.equals(field.getStateDump()) && !solveAndCheck(field))) {
 				return "問題に矛盾がある可能性があります。途中経過を返します。";
 			}
 			int recursiveCnt = 0;
-			while (field.toString().equals(befStr) && recursiveCnt < 3) {
+			while (field.getStateDump().equals(befStr) && recursiveCnt < 3) {
 				difficulty = difficulty <= recursiveCnt ? recursiveCnt + 1 : difficulty;
 				if (!candSolve(field, recursiveCnt)) {
 					return "問題に矛盾がある可能性があります。途中経過を返します。";
 				}
 				recursiveCnt++;
 			}
-			if (recursiveCnt == 3 && field.toString().equals(befStr)) {
+			if (recursiveCnt == 3 && field.getStateDump().equals(befStr)) {
 				return "解けませんでした。途中経過を返します。";
 			}
 		}
@@ -792,28 +805,30 @@ public class StostoneSolver implements Solver {
 		if (field.masu[yIndex][xIndex] == Masu.SPACE) {
 			Field virtual = new Field(field);
 			virtual.masu[yIndex][xIndex] = Masu.BLACK;
-			boolean allowBlack = solveAndCheck(virtual);
-			allowBlack = solveAndCheck(virtual);
+			String befStr = virtual.getStateDump();
+			boolean allowBlack = solveAndCheck(virtual)
+					&& (befStr.equals(virtual.getStateDump()) || solveAndCheck(virtual));
 			if (allowBlack && recursive > 0) {
 				if (!candSolve(virtual, recursive - 1)) {
 					allowBlack = false;
 				}
 			}
-			virtual = new Field(field);
-			virtual.masu[yIndex][xIndex] = Masu.NOT_BLACK;
-			boolean allowNotBlack = solveAndCheck(virtual);
-			allowNotBlack = solveAndCheck(virtual);
+			Field virtual2 = new Field(field);
+			virtual2.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+			befStr = virtual2.getStateDump();
+			boolean allowNotBlack = solveAndCheck(virtual2)
+					&& (befStr.equals(virtual2.getStateDump()) || solveAndCheck(virtual2));
 			if (allowNotBlack && recursive > 0) {
-				if (!candSolve(virtual, recursive - 1)) {
+				if (!candSolve(virtual2, recursive - 1)) {
 					allowNotBlack = false;
 				}
 			}
 			if (!allowBlack && !allowNotBlack) {
 				return false;
 			} else if (!allowBlack) {
-				field.masu[yIndex][xIndex] = Masu.NOT_BLACK;
+				field.masu = virtual2.masu;
 			} else if (!allowNotBlack) {
-				field.masu[yIndex][xIndex] = Masu.BLACK;
+				field.masu = virtual.masu;
 			}
 		}
 		return true;
