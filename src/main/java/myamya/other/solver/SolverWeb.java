@@ -24,6 +24,7 @@ import myamya.other.solver.lits.LitsSolver;
 import myamya.other.solver.norinori.NorinoriSolver;
 import myamya.other.solver.nurikabe.NurikabeSolver;
 import myamya.other.solver.nurikabe.NurikabeSolver.Room;
+import myamya.other.solver.shimaguni.ShimaguniSolver;
 import myamya.other.solver.stostone.StostoneSolver;
 import myamya.other.solver.yajilin.YajilinSolver;
 import net.arnx.jsonic.JSON;
@@ -594,6 +595,131 @@ public class SolverWeb extends HttpServlet {
 		}
 	}
 
+	static class ShimaguniSolverThread extends AbsSolveThlead {
+		private static final String HALF_NUMS = "0 1 2 3 4 5 6 7 8 9";
+		private static final String FULL_NUMS = "０１２３４５６７８９";
+
+		ShimaguniSolverThread(int height, int width, String param) {
+			super(height, width, param);
+		}
+
+		@Override
+		protected Solver getSolver(int height, int width, String param) {
+			return new ShimaguniSolver(height, width, param);
+		}
+
+		public String makeCambus() {
+			StringBuilder sb = new StringBuilder();
+			ShimaguniSolver.Field field = ((ShimaguniSolver) solver).getField();
+			int baseSize = 20;
+			sb.append(
+					"<svg xmlns=\"http://www.w3.org/2000/svg\" "
+							+ "height=\"" + (field.getYLength() * baseSize + 2 * baseSize) + "\" width=\""
+							+ (field.getXLength() * baseSize + 2 * baseSize) + "\" >");
+			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
+					Common.Masu oneMasu = field.getMasu()[yIndex][xIndex];
+					if (oneMasu.toString().equals("■")) {
+						sb.append("<rect y=\"" + (yIndex * baseSize + 2)
+								+ "\" x=\""
+								+ (xIndex * baseSize + baseSize + 2)
+								+ "\" width=\""
+								+ (baseSize - 4)
+								+ "\" height=\""
+								+ (baseSize - 4)
+								+ "\">"
+								+ "</rect>");
+					} else {
+						sb.append("<text y=\"" + (yIndex * baseSize + baseSize - 4)
+								+ "\" x=\""
+								+ (xIndex * baseSize + baseSize)
+								+ "\" font-size=\""
+								+ (baseSize - 2)
+								+ "\" fill=\""
+								+ "lime"
+								+ "\" textLength=\""
+								+ (baseSize - 2)
+								+ "\" lengthAdjust=\"spacingAndGlyphs\">"
+								+ oneMasu.toString()
+								+ "</text>");
+					}
+				}
+			}
+			// 横壁描画
+			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = -1; xIndex < field.getXLength(); xIndex++) {
+					boolean oneYokoWall = xIndex == -1 || xIndex == field.getXLength() - 1
+							|| field.getYokoWall()[yIndex][xIndex];
+					if (oneYokoWall) {
+						sb.append("<rect y=\"" + (yIndex * baseSize)
+								+ "\" x=\""
+								+ (xIndex * baseSize + 2 * baseSize)
+								+ "\" width=\""
+								+ (1)
+								+ "\" height=\""
+								+ (baseSize)
+								+ "\">"
+								+ "</rect>");
+					}
+				}
+			}
+			// 縦壁描画
+			for (int yIndex = -1; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
+					boolean oneTateWall = yIndex == -1 || yIndex == field.getYLength() - 1
+							|| field.getTateWall()[yIndex][xIndex];
+					if (oneTateWall) {
+						sb.append("<rect y=\"" + (yIndex * baseSize + baseSize)
+								+ "\" x=\""
+								+ (xIndex * baseSize + baseSize)
+								+ "\" width=\""
+								+ (baseSize)
+								+ "\" height=\""
+								+ (1)
+								+ "\">"
+								+ "</rect>");
+					}
+				}
+			}
+			// 数字描画
+			for (ShimaguniSolver.Room room : field.getRooms()) {
+				int roomBlackCount = room.getBlackCnt();
+				if (roomBlackCount != -1) {
+					String roomBlackCountStr;
+					if (roomBlackCount > 99) {
+						roomBlackCountStr = "99";
+					}
+					String wkstr = String.valueOf(roomBlackCount);
+					int index = HALF_NUMS.indexOf(wkstr);
+					if (index >= 0) {
+						roomBlackCountStr = FULL_NUMS.substring(index / 2,
+								index / 2 + 1);
+					} else {
+						roomBlackCountStr = wkstr;
+					}
+					Position numberMasuPos = room.getNumberMasuPos();
+					String fillColor = field.getMasu()[numberMasuPos.getyIndex()][numberMasuPos
+							.getxIndex()] == Common.Masu.BLACK ? "white"
+									: "black";
+					sb.append("<text y=\"" + (numberMasuPos.getyIndex() * baseSize + baseSize - 5)
+							+ "\" x=\""
+							+ (numberMasuPos.getxIndex() * baseSize + baseSize + 2)
+							+ "\" fill=\""
+							+ fillColor
+							+ "\" font-size=\""
+							+ (baseSize - 5)
+							+ "\" textLength=\""
+							+ (baseSize - 5)
+							+ "\" lengthAdjust=\"spacingAndGlyphs\">"
+							+ roomBlackCountStr
+							+ "</text>");
+				}
+			}
+			sb.append("</svg>");
+			return sb.toString();
+		}
+	}
+
 	@Override
 	protected void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
@@ -642,6 +768,12 @@ public class SolverWeb extends HttpServlet {
 				resultMap.put("status", t.getStatus());
 			} else if (puzzleType.contains("norinori")) {
 				NorinoriSolverThread t = new NorinoriSolverThread(height, width, param);
+				t.start();
+				t.join(28000);
+				resultMap.put("result", t.makeCambus());
+				resultMap.put("status", t.getStatus());
+			} else if (puzzleType.contains("shimaguni")) {
+				ShimaguniSolverThread t = new ShimaguniSolverThread(height, width, param);
 				t.start();
 				t.join(28000);
 				resultMap.put("result", t.makeCambus());

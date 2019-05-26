@@ -458,7 +458,6 @@ public class StostoneSolver implements Solver {
 		}
 
 		/**
-		/**
 		 * 部屋のマスを埋める。
 		 * 部屋に対して黒マスのルールに違反している場合はfalseを返す。
 		 */
@@ -639,7 +638,7 @@ public class StostoneSolver implements Solver {
 				Set<Position> alreadySurvey = new HashSet<>();
 				for (Position pos : room.getMember()) {
 					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK && !alreadySurvey.contains(pos)) {
-						if (!alreadySurvey.isEmpty() && !alreadySurvey.contains(pos)) {
+						if (!alreadySurvey.isEmpty()) {
 							return false;
 						}
 						Set<Position> continuePosSet = new HashSet<>();

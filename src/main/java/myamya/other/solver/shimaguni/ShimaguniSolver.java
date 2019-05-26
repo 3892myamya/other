@@ -1,85 +1,22 @@
-package myamya.other.solver.lits;
+package myamya.other.solver.shimaguni;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 import myamya.other.solver.Common.Difficulty;
 import myamya.other.solver.Common.Masu;
 import myamya.other.solver.Common.Position;
 import myamya.other.solver.Solver;
 
-public class LitsSolver implements Solver {
-
-	/**
-	 * テトロミノを示す
-	 */
-	enum Tetro {
-	L, I, T, S;
-
-		/**
-		 * テトロミノの形状を判定する。LITSのどれでもなかったらnullを返す。
-		 */
-		public static Tetro getByPositionSet(Set<Position> posSet) {
-			if (posSet.size() != 4) {
-				return null;
-			}
-			TreeMap<Integer, Integer> yKeyTreeMap = new TreeMap<>();
-			TreeMap<Integer, Integer> xKeyTreeMap = new TreeMap<>();
-			for (Position Pos : posSet) {
-				Integer ycnt = yKeyTreeMap.get(Pos.getyIndex());
-				if (ycnt == null) {
-					yKeyTreeMap.put(Pos.getyIndex(), 1);
-				} else {
-					yKeyTreeMap.put(Pos.getyIndex(), ycnt + 1);
-				}
-				Integer xcnt = xKeyTreeMap.get(Pos.getxIndex());
-				if (xcnt == null) {
-					xKeyTreeMap.put(Pos.getxIndex(), 1);
-				} else {
-					xKeyTreeMap.put(Pos.getxIndex(), xcnt + 1);
-				}
-			}
-			if (yKeyTreeMap.size() == 4 || xKeyTreeMap.size() == 4) {
-				return I;
-			} else if (yKeyTreeMap.size() == 3 && xKeyTreeMap.size() == 2) {
-				int y0 = (int) yKeyTreeMap.values().toArray()[0];
-				int y2 = (int) yKeyTreeMap.values().toArray()[2];
-				if (y0 == 2 || y2 == 2) {
-					return L;
-				} else {
-					int x0 = (int) xKeyTreeMap.values().toArray()[0];
-					int x1 = (int) xKeyTreeMap.values().toArray()[1];
-					if (x0 == 3 || x1 == 3) {
-						return T;
-					} else {
-						return S;
-					}
-				}
-			} else if (yKeyTreeMap.size() == 2 && xKeyTreeMap.size() == 3) {
-				int x0 = (int) xKeyTreeMap.values().toArray()[0];
-				int x2 = (int) xKeyTreeMap.values().toArray()[2];
-				if (x0 == 2 || x2 == 2) {
-					return L;
-				} else {
-					int y0 = (int) yKeyTreeMap.values().toArray()[0];
-					int y1 = (int) yKeyTreeMap.values().toArray()[1];
-					if (y0 == 3 || y1 == 3) {
-						return T;
-					} else {
-						return S;
-					}
-				}
-			}
-			return null;
-		}
-	}
+public class ShimaguniSolver implements Solver {
 
 	public static class Field {
 		static final String ALPHABET_FROM_G = "ghijklmnopqrstuvwxyz";
-		static final int BLACK_CNT = 4;
 
 		// マスの情報
 		private Masu[][] masu;
@@ -90,7 +27,9 @@ public class LitsSolver implements Solver {
 		// 0,0 = trueなら、0,0と1,0の間に壁があるという意味
 		private final boolean[][] tateWall;
 		// 同一グループに属するマスの情報
-		private final List<Set<Position>> rooms;
+		private final List<Room> rooms;
+		// 部屋の隣接情報
+		private final Map<Room, Set<Room>> nextRoomMap;
 
 		public Masu[][] getMasu() {
 			return masu;
@@ -102,6 +41,10 @@ public class LitsSolver implements Solver {
 
 		public boolean[][] getTateWall() {
 			return tateWall;
+		}
+
+		public List<Room> getRooms() {
+			return rooms;
 		}
 
 		public int getYLength() {
@@ -178,13 +121,44 @@ public class LitsSolver implements Solver {
 				}
 			}
 			// 縦と横の壁の関係からにょろっと部屋を決めていく
+			List<Integer> blackCntList = new ArrayList<>();
+			for (; readPos < param.length(); readPos++) {
+				char ch = param.charAt(readPos);
+				int interval = ALPHABET_FROM_G.indexOf(ch);
+				if (interval != -1) {
+					for (int i = 0; i < interval + 1; i++) {
+						// 数字がない部屋の場合は、部屋の数字は-1として扱う。
+						blackCntList.add(-1);
+					}
+				} else {
+					//16 - 255は '-'
+					//256 - 999は '+'
+					int blackCnt;
+					if (ch == '-') {
+						blackCnt = Integer.parseInt("" + param.charAt(readPos + 1) + param.charAt(readPos + 2), 16);
+						readPos++;
+						readPos++;
+					} else if (ch == '+') {
+						blackCnt = Integer.parseInt(
+								"" + param.charAt(readPos + 1) + param.charAt(readPos + 2) + param.charAt(readPos + 3),
+								16);
+						readPos++;
+						readPos++;
+						readPos++;
+					} else {
+						blackCnt = Integer.parseInt(String.valueOf(ch), 16);
+					}
+					blackCntList.add(blackCnt);
+				}
+			}
 			rooms = new ArrayList<>();
+			int blackCntListIndex = 0;
 			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
 				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
 					Position pos = new Position(yIndex, xIndex);
 					boolean alreadyRoomed = false;
-					for (Set<Position> room : rooms) {
-						if (room.contains(pos)) {
+					for (Room room : rooms) {
+						if (room.getMember().contains(pos)) {
 							alreadyRoomed = true;
 							break;
 						}
@@ -193,9 +167,30 @@ public class LitsSolver implements Solver {
 						Set<Position> continuePosSet = new HashSet<>();
 						continuePosSet.add(pos);
 						setContinuePosSet(pos, continuePosSet);
-						rooms.add(continuePosSet);
+						rooms.add(new Room(blackCntList.get(blackCntListIndex), continuePosSet));
+						blackCntListIndex++;
 					}
 				}
+			}
+			// 部屋の隣接情報
+			nextRoomMap = new HashMap<>();
+			for (Room keyRoom : rooms) {
+				Set<Room> nextRooms = new HashSet<>();
+				for (Room otherRoom : rooms) {
+					if (keyRoom == otherRoom) {
+						continue;
+					}
+					for (Position pos : keyRoom.getMember()) {
+						if (otherRoom.getMember().contains(new Position(pos.getyIndex() - 1, pos.getxIndex())) ||
+								otherRoom.getMember().contains(new Position(pos.getyIndex(), pos.getxIndex() + 1)) ||
+								otherRoom.getMember().contains(new Position(pos.getyIndex() + 1, pos.getxIndex())) ||
+								otherRoom.getMember().contains(new Position(pos.getyIndex(), pos.getxIndex() - 1))) {
+							nextRooms.add(otherRoom);
+							break;
+						}
+					}
+				}
+				nextRoomMap.put(keyRoom, nextRooms);
 			}
 		}
 
@@ -210,6 +205,7 @@ public class LitsSolver implements Solver {
 			yokoWall = other.yokoWall;
 			tateWall = other.tateWall;
 			rooms = other.rooms;
+			nextRoomMap = other.nextRoomMap;
 		}
 
 		// posを起点に上下左右に壁または白確定でないマスを無制限につなげていく。
@@ -244,45 +240,6 @@ public class LitsSolver implements Solver {
 						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
 					continuePosSet.add(nextPos);
 					setContinuePosSet(nextPos, continuePosSet);
-				}
-			}
-		}
-
-		// posを起点に上下左右に壁または白確定でないマスをposからのdistanceだけつなげていく。
-		private void setContinuePosSetUseDistance(Position pos, Set<Position> continuePosSet, int distance) {
-			if (distance == 0) {
-				return;
-			}
-			if (pos.getyIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
-				if (!tateWall[pos.getyIndex() - 1][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
-			if (pos.getxIndex() != getXLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
-				if (!yokoWall[pos.getyIndex()][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
-			if (pos.getyIndex() != getYLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
-				if (!tateWall[pos.getyIndex()][pos.getxIndex()]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
-				}
-			}
-			if (pos.getxIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
-				if (!yokoWall[pos.getyIndex()][pos.getxIndex() - 1]
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
-					continuePosSet.add(nextPos);
-					setContinuePosSetUseDistance(nextPos, continuePosSet, distance - 1);
 				}
 			}
 		}
@@ -334,39 +291,44 @@ public class LitsSolver implements Solver {
 		}
 
 		/**
-		 * 部屋のマスを埋める。黒マス不足・過剰はfalseを返す。
+		 * 部屋のマスを埋める。
+		 * 部屋に対して黒マスのルールに違反している場合はfalseを返す。
 		 */
 		public boolean roomSolve() {
-			for (Set<Position> room : rooms) {
+			for (Room room : rooms) {
+				Set<Integer> blackCountCand = serveyBlackCountCandConsiderNextRoom(room);
+				if (blackCountCand.isEmpty()) {
+					return false;
+				}
 				// 部屋に対する調査
 				int blackCnt = 0;
 				int spaceCnt = 0;
-				for (Position pos : room) {
+				for (Position pos : room.getMember()) {
 					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK) {
 						blackCnt++;
 					} else if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE) {
 						spaceCnt++;
 					}
 				}
-				if (blackCnt + spaceCnt < BLACK_CNT) {
+				if (blackCnt + spaceCnt < Collections.min(blackCountCand)) {
 					// 黒マス不足
 					return false;
 				}
 				// 置かねばならない黒マスの数
-				int retainBlackCnt = BLACK_CNT - blackCnt;
+				int retainBlackCnt = Collections.max(blackCountCand) - blackCnt;
 				if (retainBlackCnt < 0) {
 					// 黒マス超過
 					return false;
-				} else if (retainBlackCnt == 0) {
+				} else if (blackCountCand.size() == 1 && retainBlackCnt == 0) {
 					// 黒マス数が既に部屋の黒マス数に等しければ、部屋の他のマスは白マス
-					for (Position pos : room) {
+					for (Position pos : room.getMember()) {
 						if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE) {
 							masu[pos.getyIndex()][pos.getxIndex()] = Masu.NOT_BLACK;
 						}
 					}
-				} else if (spaceCnt == retainBlackCnt) {
+				} else if (blackCountCand.size() == 1 && spaceCnt == retainBlackCnt) {
 					// 未確定マスが置かねばならない黒マスの数に等しければ、未確定マスは黒マス
-					for (Position pos : room) {
+					for (Position pos : room.getMember()) {
 						if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE) {
 							masu[pos.getyIndex()][pos.getxIndex()] = Masu.BLACK;
 						}
@@ -377,153 +339,147 @@ public class LitsSolver implements Solver {
 		}
 
 		/**
-		 * 置くと池ができるマスを白マスにする。
-		 * 既に池ができている場合falseを返す。
+		 * ある部屋に対する黒マス個数の情報を返却する。隣の部屋を考慮する。
 		 */
-		public boolean pondSolve() {
-			for (int yIndex = 0; yIndex < getYLength() - 1; yIndex++) {
-				for (int xIndex = 0; xIndex < getXLength() - 1; xIndex++) {
-					Masu masu1 = masu[yIndex][xIndex];
-					Masu masu2 = masu[yIndex][xIndex + 1];
-					Masu masu3 = masu[yIndex + 1][xIndex];
-					Masu masu4 = masu[yIndex + 1][xIndex + 1];
-					if (masu1 == Masu.BLACK && masu2 == Masu.BLACK && masu3 == Masu.BLACK && masu4 == Masu.BLACK) {
-						return false;
+		private Set<Integer> serveyBlackCountCandConsiderNextRoom(Room room) {
+			Set<Integer> blackCountCand = serveyBlackCountCand(room);
+			if (blackCountCand.size() != 1) {
+				for (Room nextRoom : nextRoomMap.get(room)) {
+					Set<Integer> nextRoomBlackCountCand = serveyBlackCountCand(nextRoom);
+					if (nextRoomBlackCountCand.size() == 1) {
+						blackCountCand.removeAll(nextRoomBlackCountCand);
 					}
-					if (masu1 == Masu.BLACK && masu2 == Masu.BLACK && masu3 == Masu.BLACK && masu4 == Masu.SPACE) {
-						masu[yIndex + 1][xIndex + 1] = Masu.NOT_BLACK;
+				}
+			}
+			return blackCountCand;
+		}
+
+		/**
+		 * ある部屋に対する黒マス個数の情報を返却する。
+		 */
+		private Set<Integer> serveyBlackCountCand(Room room) {
+			Set<Integer> blackCountCand = new HashSet<>();
+			if (room.getBlackCnt() != -1) {
+				// 数字がある部屋なら確定
+				blackCountCand.add(room.getBlackCnt());
+				return blackCountCand;
+			} else {
+				int whiteCnt = 0;
+				int blackCnt = 0;
+				for (Position pos : room.getMember()) {
+					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK) {
+						blackCnt++;
+					} else if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.NOT_BLACK) {
+						whiteCnt++;
 					}
-					if (masu1 == Masu.BLACK && masu2 == Masu.BLACK && masu3 == Masu.SPACE && masu4 == Masu.BLACK) {
-						masu[yIndex + 1][xIndex] = Masu.NOT_BLACK;
+				}
+				int minBlack = blackCnt == 0 ? 1 : blackCnt;
+				int maxBlack = room.getMember().size() - whiteCnt;
+				for (int i = minBlack; i <= maxBlack; i++) {
+					blackCountCand.add(i);
+				}
+				return blackCountCand;
+			}
+		}
+
+		/**
+		 * 別部屋の黒マス隣接セルを白マスにする。
+		 * 別部屋の黒マス隣接セルが黒マスの場合falseを返す。
+		 */
+		public boolean nextSolve() {
+			Set<Position> notBlackSet = new HashSet<>();
+			for (Room room : rooms) {
+				for (Position pos : room.getMember()) {
+					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK) {
+						if (pos.getyIndex() != 0) {
+							Position blackPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
+							if (!room.getMember().contains(blackPos)) {
+								notBlackSet.add(blackPos);
+							}
+						}
+						if (pos.getxIndex() != getXLength() - 1) {
+							Position blackPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
+							if (!room.getMember().contains(blackPos)) {
+								notBlackSet.add(blackPos);
+							}
+						}
+						if (pos.getyIndex() != getYLength() - 1) {
+							Position blackPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
+							if (!room.getMember().contains(blackPos)) {
+								notBlackSet.add(blackPos);
+							}
+						}
+						if (pos.getxIndex() != 0) {
+							Position blackPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
+							if (!room.getMember().contains(blackPos)) {
+								notBlackSet.add(blackPos);
+							}
+						}
 					}
-					if (masu1 == Masu.BLACK && masu2 == Masu.SPACE && masu3 == Masu.BLACK && masu4 == Masu.BLACK) {
-						masu[yIndex][xIndex + 1] = Masu.NOT_BLACK;
-					}
-					if (masu1 == Masu.SPACE && masu2 == Masu.BLACK && masu3 == Masu.BLACK && masu4 == Masu.BLACK) {
-						masu[yIndex][xIndex] = Masu.NOT_BLACK;
-					}
+				}
+			}
+			for (Position pos : notBlackSet) {
+				if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK) {
+					return false;
+				} else {
+
+					masu[pos.getyIndex()][pos.getxIndex()] = Masu.NOT_BLACK;
 				}
 			}
 			return true;
 		}
 
 		/**
-		 * 既にある黒から届かない領域を白マスにする。
+		 * 既にある黒から届かない領域と、
 		 * 既にある黒から届かない場所に黒を見つけた場合falseを返す。
+		 * 黒がない部屋の場合、黒を埋めきれない空白を白で埋める。
 		 */
 		public boolean capacitySolve() {
-			for (Set<Position> room : rooms) {
+			for (Room room : rooms) {
+				Set<Integer> blackCountCand = serveyBlackCountCandConsiderNextRoom(room);
+				if (blackCountCand.isEmpty()) {
+					return false;
+				}
+				int blackCntMax = Collections.max(blackCountCand);
 				Set<Position> alreadySurvey = new HashSet<>();
-				for (Position pos : room) {
+				for (Position pos : room.getMember()) {
 					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK && !alreadySurvey.contains(pos)) {
 						if (!alreadySurvey.isEmpty()) {
 							return false;
 						}
 						Set<Position> continuePosSet = new HashSet<>();
 						continuePosSet.add(pos);
-						setContinuePosSetUseDistance(pos, continuePosSet, BLACK_CNT - 1);
+
+						setContinuePosSetUseDistance(new HashSet<>(continuePosSet), continuePosSet,
+								blackCntMax - 1);
 						alreadySurvey.addAll(continuePosSet);
 					}
 				}
 				if (!alreadySurvey.isEmpty()) {
-					Set<Position> toWhitePosSet = new HashSet<>(room);
+					Set<Position> toWhitePosSet = new HashSet<>(room.getMember());
 					toWhitePosSet.removeAll(alreadySurvey);
 					for (Position pos : toWhitePosSet) {
 						if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE) {
 							masu[pos.getyIndex()][pos.getxIndex()] = Masu.NOT_BLACK;
 						}
 					}
-				}
-			}
-			return true;
-		}
-
-		/**
-		 * 黒マスがひとつながりにならない場合Falseを返す。
-		 */
-		public boolean connectSolve() {
-			Set<Position> blackPosSet = new HashSet<>();
-			Position typicalBlackPos = null;
-			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
-				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {
-					if (masu[yIndex][xIndex] == Masu.BLACK) {
-						Position blackPos = new Position(yIndex, xIndex);
-						blackPosSet.add(blackPos);
-						if (typicalBlackPos == null) {
-							typicalBlackPos = blackPos;
-						}
-					}
-				}
-			}
-			if (typicalBlackPos == null) {
-				return true;
-			} else {
-				Set<Position> continuePosSet = new HashSet<>();
-				setContinuePosSetIgnoreWall(typicalBlackPos, continuePosSet);
-				blackPosSet.removeAll(continuePosSet);
-				return blackPosSet.isEmpty();
-			}
-		}
-
-		/**
-		 * 別部屋に同じ形のテトロミノが隣接する場合Falseを返す。
-		 */
-		public boolean nextSolve() {
-			for (int i = 0; i < rooms.size(); i++) {
-				Set<Position> room = rooms.get(i);
-				Set<Position> myRoomBlackSet = new HashSet<>();
-				Set<Position> nextRoomPosSet = new HashSet<>();
-				for (Position pos : room) {
-					if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.BLACK) {
-						myRoomBlackSet.add(pos);
-						if (pos.getyIndex() != 0) {
-							Position blackPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
-							if (!room.contains(blackPos)) {
-								nextRoomPosSet.add(blackPos);
-							}
-						}
-						if (pos.getxIndex() != getXLength() - 1) {
-							Position blackPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
-							if (!room.contains(blackPos)) {
-								nextRoomPosSet.add(blackPos);
-							}
-						}
-						if (pos.getyIndex() != getYLength() - 1) {
-							Position blackPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
-							if (!room.contains(blackPos)) {
-								nextRoomPosSet.add(blackPos);
-							}
-						}
-						if (pos.getxIndex() != 0) {
-							Position blackPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
-							if (!room.contains(blackPos)) {
-								nextRoomPosSet.add(blackPos);
+				} else {
+					int blackCntMin = Collections.min(blackCountCand);
+					for (Position pos : room.getMember()) {
+						if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE && !alreadySurvey.contains(pos)) {
+							Set<Position> continuePosSet = new HashSet<>();
+							continuePosSet.add(pos);
+							setContinuePosSetUseDistance(new HashSet<>(continuePosSet), continuePosSet,
+									blackCntMin - 1);
+							if (continuePosSet.size() < blackCntMin) {
+								alreadySurvey.addAll(continuePosSet);
 							}
 						}
 					}
-				}
-				// 自分の部屋の黒が4マスの場合のみ調査
-				if (myRoomBlackSet.size() == BLACK_CNT) {
-					Set<Integer> checkedRoom = new HashSet<>();
-					for (Position nextRoomPos : nextRoomPosSet) {
-						// 隣接マスが黒マスの場合のみ調査
-						if (masu[nextRoomPos.getyIndex()][nextRoomPos.getxIndex()] == Masu.BLACK) {
-							for (int j = i; j < rooms.size(); j++) {
-								if (checkedRoom.contains(j)) {
-									continue;
-								}
-								if (rooms.get(j).contains(nextRoomPos)) {
-									checkedRoom.add(j);
-									Set<Position> otherRoomBlackSet = new HashSet<>();
-									otherRoomBlackSet.add(nextRoomPos);
-									setContinuePosSetUseDistance(nextRoomPos, otherRoomBlackSet, BLACK_CNT - 1);
-									// 4マスで同じ形ならfalse
-									if (otherRoomBlackSet.size() == BLACK_CNT
-											&& Tetro.getByPositionSet(myRoomBlackSet) == Tetro
-													.getByPositionSet(otherRoomBlackSet)) {
-										return false;
-									}
-								}
+					if (!alreadySurvey.isEmpty()) {
+						for (Position pos : alreadySurvey) {
+							if (masu[pos.getyIndex()][pos.getxIndex()] == Masu.SPACE) {
+								masu[pos.getyIndex()][pos.getxIndex()] = Masu.NOT_BLACK;
 							}
 						}
 					}
@@ -533,39 +489,88 @@ public class LitsSolver implements Solver {
 		}
 
 		/**
-		 * posを起点に上下左右に白確定でないマスをつなげていく。壁は無視する。
+		 * pivotPosSetを起点に上下左右に壁または白確定でないマスをpivotPosSetからのdistanceだけつなげていく。
 		 */
-		private void setContinuePosSetIgnoreWall(Position pos, Set<Position> continuePosSet) {
+		private void setContinuePosSetUseDistance(Set<Position> pivotPosSet, Set<Position> continuePosSet,
+				int distance) {
+			if (distance == 0 || pivotPosSet.isEmpty()) {
+				return;
+			}
+			Set<Position> nextPivotPosSet = new HashSet<>();
+			for (Position pos : pivotPosSet) {
+				if (pos.getyIndex() != 0) {
+					Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
+					if (!tateWall[pos.getyIndex() - 1][pos.getxIndex()] && !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getxIndex() != getXLength() - 1) {
+					Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
+					if (!yokoWall[pos.getyIndex()][pos.getxIndex()]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getyIndex() != getYLength() - 1) {
+					Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
+					if (!tateWall[pos.getyIndex()][pos.getxIndex()]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+				if (pos.getxIndex() != 0) {
+					Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
+					if (!yokoWall[pos.getyIndex()][pos.getxIndex() - 1]
+							&& !continuePosSet.contains(nextPos)
+							&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						nextPivotPosSet.add(nextPos);
+						continuePosSet.add(nextPos);
+					}
+				}
+			}
+			setContinuePosSetUseDistance(nextPivotPosSet, continuePosSet, distance - 1);
+		}
+
+		/**
+		 * posを起点に上下左右に黒確定でないマスをつなげていく。壁は無視する。
+		 */
+		private void setContinueWhitePosSet(Position pos, Set<Position> continuePosSet) {
 			if (pos.getyIndex() != 0) {
 				Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
 				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
 					continuePosSet.add(nextPos);
-					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
+					setContinueWhitePosSet(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getxIndex() != getXLength() - 1) {
 				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
 				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
 					continuePosSet.add(nextPos);
-					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
+					setContinueWhitePosSet(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getyIndex() != getYLength() - 1) {
 				Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
 				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
 					continuePosSet.add(nextPos);
-					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
+					setContinueWhitePosSet(nextPos, continuePosSet);
 				}
 			}
 			if (pos.getxIndex() != 0) {
 				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
 				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.NOT_BLACK) {
+						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
 					continuePosSet.add(nextPos);
-					setContinuePosSetIgnoreWall(nextPos, continuePosSet);
+					setContinueWhitePosSet(nextPos, continuePosSet);
 				}
 			}
 		}
@@ -583,9 +588,53 @@ public class LitsSolver implements Solver {
 
 	}
 
+	public static class Room {
+		@Override
+		public String toString() {
+			return "Room [blackCnt=" + blackCnt + ", member=" +
+					member + "]";
+		}
+
+		// 黒マスが何マスあるか。数字がない場合は-1
+		private final int blackCnt;
+		// 部屋に属するマスの集合
+		private final Set<Position> member;
+
+		public Room(int capacity, Set<Position> member) {
+			this.blackCnt = capacity;
+			this.member = member;
+		}
+
+		public int getBlackCnt() {
+			return blackCnt;
+		}
+
+		public Set<Position> getMember() {
+			return member;
+		}
+
+		// 一番左→一番上の位置を返す。画面の数字描画用。
+		public Position getNumberMasuPos() {
+			int yIndex = Integer.MAX_VALUE;
+			int xIndex = Integer.MAX_VALUE;
+			for (Position pos : member) {
+				if (pos.getxIndex() < xIndex) {
+					xIndex = pos.getxIndex();
+				}
+			}
+			for (Position pos : member) {
+				if (pos.getxIndex() == xIndex && pos.getyIndex() < yIndex) {
+					yIndex = pos.getyIndex();
+				}
+			}
+			return new Position(yIndex, xIndex);
+		}
+
+	}
+
 	private final Field field;
 
-	public LitsSolver(int height, int width, String param) {
+	public ShimaguniSolver(int height, int width, String param) {
 		field = new Field(height, width, param);
 	}
 
@@ -599,7 +648,7 @@ public class LitsSolver implements Solver {
 		int height = Integer.parseInt(params[params.length - 2]);
 		int width = Integer.parseInt(params[params.length - 3]);
 		String param = params[params.length - 1];
-		System.out.println(new LitsSolver(height, width, param).solve());
+		System.out.println(new ShimaguniSolver(height, width, param).solve());
 	}
 
 	@Override
@@ -640,16 +689,10 @@ public class LitsSolver implements Solver {
 		if (!field.roomSolve()) {
 			return false;
 		}
-		if (!field.pondSolve()) {
+		if (!field.nextSolve()) {
 			return false;
 		}
 		if (!field.capacitySolve()) {
-			return false;
-		}
-		if (!field.connectSolve()) {
-			return false;
-		}
-		if (!field.nextSolve()) {
 			return false;
 		}
 		return true;
