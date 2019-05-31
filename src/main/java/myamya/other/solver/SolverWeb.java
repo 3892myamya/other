@@ -849,9 +849,6 @@ public class SolverWeb extends HttpServlet {
 	}
 
 	static class AkariSolverThread extends AbsSolveThlead {
-		private static final String HALF_NUMS = "0 1 2 3 4 5 6 7 8 9";
-		private static final String FULL_NUMS = "０１２３４５６７８９";
-
 		AkariSolverThread(int height, int width, String param) {
 			super(height, width, param);
 		}
@@ -896,6 +893,14 @@ public class SolverWeb extends HttpServlet {
 									+ oneMasu.toString()
 									+ "</text>");
 						}
+					} else if (oneMasu == AkariSolver.Masu.AKARI) {
+						sb.append("<circle cy=\"" + (yIndex * baseSize + (baseSize / 2))
+								+ "\" cx=\""
+								+ (xIndex * baseSize + baseSize + (baseSize / 2))
+								+ "\" r=\""
+								+ (baseSize / 2 - 2)
+								+ "\" fill=\"white\", stroke=\"black\">"
+								+ "</circle>");
 					} else {
 						sb.append("<text y=\"" + (yIndex * baseSize + baseSize - 4)
 								+ "\" x=\""

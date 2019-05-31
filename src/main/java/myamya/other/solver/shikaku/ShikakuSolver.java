@@ -428,7 +428,7 @@ public class ShikakuSolver implements Solver {
 	}
 
 	public static void main(String[] args) {
-		String url = "http://pzv.jp/p.html?shikaku/10/10/g8h8g6r4jar4i5v8i6r9j6r6g4h-10g"; //urlを入れれば試せる
+		String url = ""; //urlを入れれば試せる
 		String[] params = url.split("/");
 		int height = Integer.parseInt(params[params.length - 2]);
 		int width = Integer.parseInt(params[params.length - 3]);
