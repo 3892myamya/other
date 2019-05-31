@@ -537,44 +537,6 @@ public class ShimaguniSolver implements Solver {
 			setContinuePosSetUseDistance(nextPivotPosSet, continuePosSet, distance - 1);
 		}
 
-		/**
-		 * posを起点に上下左右に黒確定でないマスをつなげていく。壁は無視する。
-		 */
-		private void setContinueWhitePosSet(Position pos, Set<Position> continuePosSet) {
-			if (pos.getyIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex() - 1, pos.getxIndex());
-				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
-					continuePosSet.add(nextPos);
-					setContinueWhitePosSet(nextPos, continuePosSet);
-				}
-			}
-			if (pos.getxIndex() != getXLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() + 1);
-				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
-					continuePosSet.add(nextPos);
-					setContinueWhitePosSet(nextPos, continuePosSet);
-				}
-			}
-			if (pos.getyIndex() != getYLength() - 1) {
-				Position nextPos = new Position(pos.getyIndex() + 1, pos.getxIndex());
-				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
-					continuePosSet.add(nextPos);
-					setContinueWhitePosSet(nextPos, continuePosSet);
-				}
-			}
-			if (pos.getxIndex() != 0) {
-				Position nextPos = new Position(pos.getyIndex(), pos.getxIndex() - 1);
-				if (!continuePosSet.contains(nextPos)
-						&& masu[nextPos.getyIndex()][nextPos.getxIndex()] != Masu.BLACK) {
-					continuePosSet.add(nextPos);
-					setContinueWhitePosSet(nextPos, continuePosSet);
-				}
-			}
-		}
-
 		public boolean isSolved() {
 			for (int yIndex = 0; yIndex < getYLength(); yIndex++) {
 				for (int xIndex = 0; xIndex < getXLength(); xIndex++) {

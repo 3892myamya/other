@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -19,11 +20,15 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import myamya.other.solver.Common.Position;
+import myamya.other.solver.akari.AkariSolver;
 import myamya.other.solver.heyawake.HeyawakeSolver;
 import myamya.other.solver.lits.LitsSolver;
 import myamya.other.solver.norinori.NorinoriSolver;
 import myamya.other.solver.nurikabe.NurikabeSolver;
 import myamya.other.solver.nurikabe.NurikabeSolver.Room;
+import myamya.other.solver.shikaku.ShikakuSolver;
+import myamya.other.solver.shikaku.ShikakuSolver.Sikaku;
+import myamya.other.solver.shikaku.ShikakuSolver.Wall;
 import myamya.other.solver.shimaguni.ShimaguniSolver;
 import myamya.other.solver.stostone.StostoneSolver;
 import myamya.other.solver.yajilin.YajilinSolver;
@@ -135,9 +140,6 @@ public class SolverWeb extends HttpServlet {
 						String masuStr = null;
 						for (Room room : field.rooms) {
 							if (room.getPivot().equals(new Position(yIndex, xIndex))) {
-								if (room.getCapacity() > 99) {
-									masuStr = "99";
-								}
 								String capacityStr = String.valueOf(room.getCapacity());
 								int index = HALF_NUMS.indexOf(capacityStr);
 								if (index >= 0) {
@@ -260,9 +262,6 @@ public class SolverWeb extends HttpServlet {
 				int roomBlackCount = room.getBlackCnt();
 				if (roomBlackCount != -1) {
 					String roomBlackCountStr;
-					if (roomBlackCount > 99) {
-						roomBlackCountStr = "99";
-					}
 					String wkstr = String.valueOf(roomBlackCount);
 					int index = HALF_NUMS.indexOf(wkstr);
 					if (index >= 0) {
@@ -385,9 +384,6 @@ public class SolverWeb extends HttpServlet {
 				int roomBlackCount = room.getBlackCnt();
 				if (roomBlackCount != -1) {
 					String roomBlackCountStr;
-					if (roomBlackCount > 99) {
-						roomBlackCountStr = "99";
-					}
 					String wkstr = String.valueOf(roomBlackCount);
 					int index = HALF_NUMS.indexOf(wkstr);
 					if (index >= 0) {
@@ -686,9 +682,6 @@ public class SolverWeb extends HttpServlet {
 				int roomBlackCount = room.getBlackCnt();
 				if (roomBlackCount != -1) {
 					String roomBlackCountStr;
-					if (roomBlackCount > 99) {
-						roomBlackCountStr = "99";
-					}
 					String wkstr = String.valueOf(roomBlackCount);
 					int index = HALF_NUMS.indexOf(wkstr);
 					if (index >= 0) {
@@ -713,6 +706,208 @@ public class SolverWeb extends HttpServlet {
 							+ "\" lengthAdjust=\"spacingAndGlyphs\">"
 							+ roomBlackCountStr
 							+ "</text>");
+				}
+			}
+			sb.append("</svg>");
+			return sb.toString();
+		}
+	}
+
+	static class ShikakuSolverThread extends AbsSolveThlead {
+		private static final String HALF_NUMS = "0 1 2 3 4 5 6 7 8 9";
+		private static final String FULL_NUMS = "０１２３４５６７８９";
+
+		ShikakuSolverThread(int height, int width, String param) {
+			super(height, width, param);
+		}
+
+		@Override
+		protected Solver getSolver(int height, int width, String param) {
+			return new ShikakuSolver(height, width, param);
+		}
+
+		public String makeCambus() {
+			StringBuilder sb = new StringBuilder();
+			ShikakuSolver.Field field = ((ShikakuSolver) solver).getField();
+			int baseSize = 20;
+			int margin = 5;
+			sb.append(
+					"<svg xmlns=\"http://www.w3.org/2000/svg\" "
+							+ "height=\"" + (field.getYLength() * baseSize + 2 * baseSize + margin) + "\" width=\""
+							+ (field.getXLength() * baseSize + 2 * baseSize) + "\" >");
+			Wall[][] yokoWall = new Wall[field.getYLength()][field.getXLength() - 1];
+			Wall[][] tateWall = new Wall[field.getYLength() - 1][field.getXLength()];
+			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength() - 1; xIndex++) {
+					yokoWall[yIndex][xIndex] = Wall.NOT_EXISTS;
+				}
+			}
+			for (int yIndex = 0; yIndex < field.getYLength() - 1; yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
+					tateWall[yIndex][xIndex] = Wall.NOT_EXISTS;
+				}
+			}
+			for (Set<Sikaku> sikakuSet : field.getRoomCand().values()) {
+				if (sikakuSet.size() == 1) {
+					Sikaku sikaku = (Sikaku) sikakuSet.toArray()[0];
+					for (int yIndex = sikaku.getLeftUp().getyIndex(); yIndex <= sikaku.getRightDown()
+							.getyIndex(); yIndex++) {
+						if (sikaku.getLeftUp().getxIndex() > 0) {
+							yokoWall[yIndex][sikaku.getLeftUp().getxIndex() - 1] = Wall.EXISTS;
+						}
+						if (sikaku.getRightDown().getxIndex() < field.getXLength() - 1) {
+							yokoWall[yIndex][sikaku.getRightDown().getxIndex()] = Wall.EXISTS;
+						}
+					}
+					for (int xIndex = sikaku.getLeftUp().getxIndex(); xIndex <= sikaku.getRightDown()
+							.getxIndex(); xIndex++) {
+						if (sikaku.getLeftUp().getyIndex() > 0) {
+							tateWall[sikaku.getLeftUp().getyIndex() - 1][xIndex] = Wall.EXISTS;
+						}
+						if (sikaku.getRightDown().getyIndex() < field.getYLength() - 1) {
+							tateWall[sikaku.getRightDown().getyIndex()][xIndex] = Wall.EXISTS;
+						}
+					}
+				}
+			}
+			// 横壁描画
+			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = -1; xIndex < field.getXLength(); xIndex++) {
+					boolean oneYokoWall = xIndex == -1 || xIndex == field.getXLength() - 1
+							|| yokoWall[yIndex][xIndex] == Wall.EXISTS;
+					sb.append("<line y1=\""
+							+ (yIndex * baseSize + margin)
+							+ "\" x1=\""
+							+ (xIndex * baseSize + 2 * baseSize)
+							+ "\" y2=\""
+							+ (yIndex * baseSize + baseSize + margin)
+							+ "\" x2=\""
+							+ (xIndex * baseSize + 2 * baseSize)
+							+ "\" stroke-width=\"1\" fill=\"none\"");
+					if (oneYokoWall) {
+						sb.append("stroke=\"#000\" ");
+					} else {
+						sb.append("stroke=\"#AAA\" stroke-dasharray=\"2\" ");
+					}
+					sb.append(">"
+							+ "</line>");
+				}
+			}
+			// 縦壁描画
+			for (int yIndex = -1; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
+					boolean oneTateWall = yIndex == -1 || yIndex == field.getYLength() - 1
+							|| tateWall[yIndex][xIndex] == Wall.EXISTS;
+					sb.append("<line y1=\""
+							+ (yIndex * baseSize + baseSize + margin)
+							+ "\" x1=\""
+							+ (xIndex * baseSize + baseSize)
+							+ "\" y2=\""
+							+ (yIndex * baseSize + baseSize + margin)
+							+ "\" x2=\""
+							+ (xIndex * baseSize + baseSize + baseSize)
+							+ "\" stroke-width=\"1\" fill=\"none\"");
+					if (oneTateWall) {
+						sb.append("stroke=\"#000\" ");
+					} else {
+						sb.append("stroke=\"#AAA\" stroke-dasharray=\"2\" ");
+					}
+					sb.append(">"
+							+ "</line>");
+				}
+			}
+			// 数字描画
+			for (ShikakuSolver.Room room : field.getRooms()) {
+				int roomCapacity = room.getCapacity();
+				if (roomCapacity != -1) {
+					String roomBlackCountStr;
+					String wkstr = String.valueOf(roomCapacity);
+					int index = HALF_NUMS.indexOf(wkstr);
+					if (index >= 0) {
+						roomBlackCountStr = FULL_NUMS.substring(index / 2,
+								index / 2 + 1);
+					} else {
+						roomBlackCountStr = wkstr;
+					}
+					Position numberMasuPos = room.getPivot();
+					sb.append("<text y=\"" + (numberMasuPos.getyIndex() * baseSize + baseSize - 5 + margin)
+							+ "\" x=\""
+							+ (numberMasuPos.getxIndex() * baseSize + baseSize + 2)
+							+ "\" font-size=\""
+							+ (baseSize - 5)
+							+ "\" textLength=\""
+							+ (baseSize - 5)
+							+ "\" lengthAdjust=\"spacingAndGlyphs\">"
+							+ roomBlackCountStr
+							+ "</text>");
+				}
+			}
+			sb.append("</svg>");
+			return sb.toString();
+		}
+
+	}
+
+	static class AkariSolverThread extends AbsSolveThlead {
+		private static final String HALF_NUMS = "0 1 2 3 4 5 6 7 8 9";
+		private static final String FULL_NUMS = "０１２３４５６７８９";
+
+		AkariSolverThread(int height, int width, String param) {
+			super(height, width, param);
+		}
+
+		@Override
+		protected Solver getSolver(int height, int width, String param) {
+			return new AkariSolver(height, width, param);
+		}
+
+		public String makeCambus() {
+			StringBuilder sb = new StringBuilder();
+			AkariSolver.Field field = ((AkariSolver) solver).getField();
+			int baseSize = 20;
+			sb.append(
+					"<svg xmlns=\"http://www.w3.org/2000/svg\" "
+							+ "height=\"" + (field.getYLength() * baseSize + baseSize) + "\" width=\""
+							+ (field.getXLength() * baseSize + baseSize) + "\" >");
+			for (int yIndex = 0; yIndex < field.getYLength(); yIndex++) {
+				for (int xIndex = 0; xIndex < field.getXLength(); xIndex++) {
+					AkariSolver.Masu oneMasu = field.getMasu()[yIndex][xIndex];
+					if (oneMasu.isWall()) {
+						sb.append("<rect y=\"" + (yIndex * baseSize)
+								+ "\" x=\""
+								+ (xIndex * baseSize + baseSize)
+								+ "\" width=\""
+								+ (baseSize)
+								+ "\" height=\""
+								+ (baseSize)
+								+ "\">"
+								+ "</rect>");
+						if (oneMasu.getCnt() != -1) {
+							sb.append("<text y=\"" + (yIndex * baseSize + baseSize - 5)
+									+ "\" x=\""
+									+ (xIndex * baseSize + baseSize + 2)
+									+ "\" fill=\""
+									+ "white"
+									+ "\" font-size=\""
+									+ (baseSize - 5)
+									+ "\" textLength=\""
+									+ (baseSize - 5)
+									+ "\" lengthAdjust=\"spacingAndGlyphs\">"
+									+ oneMasu.toString()
+									+ "</text>");
+						}
+					} else {
+						sb.append("<text y=\"" + (yIndex * baseSize + baseSize - 4)
+								+ "\" x=\""
+								+ (xIndex * baseSize + baseSize)
+								+ "\" font-size=\""
+								+ (baseSize - 2)
+								+ "\" textLength=\""
+								+ (baseSize - 2)
+								+ "\" lengthAdjust=\"spacingAndGlyphs\">"
+								+ oneMasu.toString()
+								+ "</text>");
+					}
 				}
 			}
 			sb.append("</svg>");
@@ -774,6 +969,18 @@ public class SolverWeb extends HttpServlet {
 				resultMap.put("status", t.getStatus());
 			} else if (puzzleType.contains("shimaguni")) {
 				ShimaguniSolverThread t = new ShimaguniSolverThread(height, width, param);
+				t.start();
+				t.join(28000);
+				resultMap.put("result", t.makeCambus());
+				resultMap.put("status", t.getStatus());
+			} else if (puzzleType.contains("shikaku")) {
+				ShikakuSolverThread t = new ShikakuSolverThread(height, width, param);
+				t.start();
+				t.join(28000);
+				resultMap.put("result", t.makeCambus());
+				resultMap.put("status", t.getStatus());
+			} else if (puzzleType.contains("akari") || puzzleType.contains("lightup")) {
+				AkariSolverThread t = new AkariSolverThread(height, width, param);
 				t.start();
 				t.join(28000);
 				resultMap.put("result", t.makeCambus());
